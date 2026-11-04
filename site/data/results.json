@@ -1,0 +1,71 @@
+{
+  "status": "pending",
+  "design": {
+    "total_steps": 143000,
+    "checkpoints": [
+      512,
+      1000,
+      2000,
+      3000,
+      4000,
+      6000,
+      8000,
+      10000,
+      13000,
+      16000,
+      20000,
+      24000,
+      28000,
+      33000,
+      38000,
+      43000,
+      49000,
+      55000,
+      61000,
+      68000,
+      75000,
+      82000,
+      90000,
+      98000,
+      106000,
+      114000,
+      122000,
+      130000,
+      137000,
+      143000
+    ],
+    "timing_filter": {
+      "min_checkpoints_before_t0": 3,
+      "t0_min_fraction": 0.1,
+      "t0_max_fraction": 0.9
+    }
+  },
+  "blocks": {
+    "event_study": {
+      "status": "pending",
+      "summary": null,
+      "figure": null
+    },
+    "counterfactual": {
+      "status": "pending",
+      "summary": null,
+      "figure": null
+    },
+    "ability": {
+      "status": "pending",
+      "summary": null,
+      "figure": null
+    },
+    "transfer": {
+      "status": "pending",
+      "summary": null,
+      "figure": null
+    }
+  },
+  "provenance": {
+    "config_path": "",
+    "config_hash": "bc475b3ddea2e8c9",
+    "git_commit": "fd2eac2cd0238dbe535b1043bcb9421e0f57f8b7-dirty",
+    "created_utc": "2026-11-04T21:20:01+00:00"
+  }
+}

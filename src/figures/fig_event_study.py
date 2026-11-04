@@ -44,6 +44,7 @@ def main(argv=None) -> None:
     out = REPO_ROOT / cfg["figure"]["output"]
     out.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out)
+    fig.savefig(out.with_suffix(".svg"))  # for the project website (figures.site_data)
     print(f"wrote {out}")
 
 
