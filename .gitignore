@@ -38,3 +38,6 @@ lm_eval_cache/
 
 # design skill working files
 .taste-skill/
+
+# Vercel
+.vercel/
