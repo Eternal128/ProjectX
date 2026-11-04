@@ -1,0 +1,34 @@
+# Exposure IRT and standard 2PL (src/irt). Uses binary y only, never logp.
+
+seed: 0
+evals_path: data/evals/evals.parquet
+output_dir: data/results/irt
+
+priors:
+  theta: {loc: 0.0, scale: 1.0}       # fixes the scale
+  b: {loc: 0.0, scale: 2.0}
+  log_a: {loc: 0.0, scale: 0.5}       # a = exp(log_a) > 0
+  delta: {loc: 0.0, scale: 1.0}
+
+# Fitting order (AGENTS.md). Advance only when the previous step passes.
+#   1 map_shared_delta  2 map_full  3 svi  4 nuts_subset
+stage: map_shared_delta
+terms:
+  dose: false      # delta_1 * log(1 + n)
+  ability: false   # delta_2 * theta; drop this first if anything fails to fit
+
+map:
+  steps: 4000
+  learning_rate: 0.02
+svi:
+  steps: 20000
+  learning_rate: 0.005
+  posterior_samples: 1000
+nuts:
+  item_subset_size: 300
+  num_warmup: 1000
+  num_samples: 1000
+  num_chains: 4
+
+figure:
+  output: outputs/figures/counterfactual.pdf

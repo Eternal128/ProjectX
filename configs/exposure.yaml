@@ -1,0 +1,40 @@
+# Exposure detection (src/exposure). Thresholds are PROVISIONAL until fixed on the
+# development split; once fixed, any change must be logged in docs/prereg_changes.md.
+# Never tune these to make a hypothesis pass.
+
+infini_gram:
+  api_url: https://api.infini-gram.io/
+  # VERIFY against the infini-gram docs: index name for the full Pile train set.
+  index: v4_piletrain_llama
+  cache_dir: data/exposure/infini_gram_cache
+  max_requests_per_second: 5
+
+retrieval:
+  long_ngram_tokens: 13      # long exact-match n-grams (question and answer)
+  short_ngram_tokens: 8      # shorter n-grams for the wider candidate set
+  stride_tokens: 4
+  max_docs_per_query: 20
+
+embedding:
+  model: sentence-transformers/all-mpnet-base-v2
+  batch_size: 64
+
+tiers:
+  # confirmed: long exact match that covers both question and answer
+  # likely:    max cosine similarity >= likely_min_similarity, no exact match
+  # clean:     no candidate with similarity >= clean_max_similarity
+  # anything in between is "ambiguous" and excluded from both groups
+  likely_min_similarity: 0.85
+  clean_max_similarity: 0.50
+
+timing_filter:
+  min_checkpoints_before_t0: 3
+  t0_min_fraction: 0.10
+  t0_max_fraction: 0.90
+
+go_no_go:
+  min_confirmed_after_timing_filter: 200
+
+hand_validation:
+  items_per_tier: 100
+  seed: 20260101

@@ -1,0 +1,34 @@
+# Event study (src/event_study). Uses continuous logp only, never y.
+
+seed: 0
+evals_path: data/evals/evals.parquet
+output_dir: data/results/event_study
+models_config: configs/models.yaml
+exposure_config: configs/exposure.yaml
+# Results are reported stratified by t0 (AGENTS.md); number of equal-count t0 bins.
+t0_strata: 3
+
+matching:
+  clean_matches_per_item: 5
+  # Base difficulty used for matching: mean logp over checkpoints before
+  # t0_min_fraction of training. The timing filter guarantees every kept t0 is
+  # later than this, so matching difficulty is never affected by exposure.
+  difficulty_max_step_fraction: 0.10
+  with_replacement: true
+
+window:
+  pre: 5      # event times -5 .. -1  (in checkpoints)
+  post: 8     # event times  0 .. 8
+  reference: -1
+
+bootstrap:
+  reps: 2000
+  level: 0.95
+
+pretrend:
+  # Pre-trend is flagged when the bootstrap CI of the mean pre-period effect
+  # (event times -pre .. -2) excludes zero.
+  level: 0.95
+
+figure:
+  output: outputs/figures/event_study.pdf

@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "seen-or-solved"
+version = "0.1.0"
+description = "Decomposing Pythia's benchmark progress into memorization (exposure) and generalization."
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.10"
+# Analysis dependencies. Versions are pinned so results are reproducible;
+# bump deliberately and record the change in the commit message.
+dependencies = [
+    "numpy==2.5.4",
+    "scipy==1.18.1",
+    "pandas==3.1.1",
+    "pyarrow==26.0.1",
+    "pyyaml==6.0.3",
+    "matplotlib==3.11.2",
+    "jax==0.12.0.1",
+    "jaxlib==0.12.0.1",
+    "numpyro==0.22.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest==9.2.0"]
+# Checkpoint evaluation (GPU host). Confirm these on the GPU machine during Phase 0.
+eval = [
+    "lm_eval==0.4.13",
+    "transformers==5.22.1",
+    "torch==2.15.0",
+    "huggingface_hub==2.4.0",
+]
+# Exposure detection
+exposure = [
+    "requests==2.34.2",
+    "sentence-transformers==6.2.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+markers = ["slow: long-running tests (IRT recovery)"]
