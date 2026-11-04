@@ -155,6 +155,7 @@ One script per figure in `src/figures/`, reading only from `data/`. Every figure
 - Every run is driven by a config file, and outputs record the config hash and git commit.
 - Never look at final results before the analysis code and thresholds are fixed. Write analysis code against a small development split first.
 - Notebooks are for exploration. Anything a result depends on lives in `src/` with a test.
+- Branches are named `<your-name>/<feature-name>` in short kebab-case, e.g. `james/step-mapping`.
 - Commit messages say what changed and why. Open a pull request for any change to `src/irt/` or `src/event_study/`, reviewed by the statistics lead.
 - Keep compute in check. The core project should need about 50 to 100 GPU hours, mostly checkpoint evaluation. Flag anything that looks like it will exceed that.
 
