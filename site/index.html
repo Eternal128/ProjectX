@@ -1,0 +1,345 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Seen or Solved? Did the AI learn it, or memorize it?</title>
+<meta name="description" content="AI models are judged by test scores, but they may have already seen the test questions while learning. A University of Toronto student project measures how much of one AI's improving scores comes from memory.">
+<meta property="og:title" content="Seen or Solved? Did the AI learn it, or memorize it?">
+<meta property="og:description" content="How much of an AI's improving test score comes from having already seen the questions?">
+<meta name="theme-color" content="#ffffff">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%23a1ffcb' stroke='%23232323' stroke-width='6'/%3E%3C/svg%3E">
+<script>document.documentElement.classList.add('js')</script>
+<link rel="preconnect" href="https://api.fontshare.com">
+<link rel="preconnect" href="https://cdn.fontshare.com" crossorigin>
+<link href="https://api.fontshare.com/v2/css?f[]=clash-grotesk@400,500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/site.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="hero" id="top">
+  <div class="hero__left">
+    <a class="wordmark" href="#top" aria-label="Seen or Solved?, back to top"><span class="wordmark__dot" aria-hidden="true"></span>Seen or Solved?</a>
+    <div class="hero__copy">
+      <h1><span class="line"><span>Seen or solved?</span></span><span class="line"><span>Did the AI learn it?</span></span></h1>
+      <p class="hero__sentence">AI models are judged by test scores. But these models learn by reading huge amounts of internet text, and many test questions are on the internet. We are measuring how much of one AI’s rising score comes from having already seen the questions.</p>
+      <div class="hero__actions">
+        <a class="button" href="#idea">Start with the idea <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M4 12h15M13 6l6 6-6 6"/></svg></a>
+        <a class="link" href="proposal.html">Read the full proposal</a>
+      </div>
+    </div>
+  </div>
+  <div class="hero__right">
+    <a class="hero__toplink link" href="https://github.com/Eternal128/ProjectX">Code on GitHub</a>
+    <div class="probe" data-ui>
+      <div class="probe__head">
+        <p class="probe__title">Try it: when did the AI read a test question?</p>
+        <p class="ui-label">step <span class="num" id="p-step-head">41,000</span></p>
+      </div>
+      <div class="chart probe__chart" id="probe-chart" role="img" aria-label="Training from start to finish, with the 30 saved snapshots we test and the point where the AI read the question."></div>
+      <label class="visually-hidden" for="t0">When the AI read the question, as a training step</label>
+      <input class="probe__range" id="t0" type="range" min="0" max="143000" step="500" value="41000" aria-describedby="p-verdict">
+      <dl class="probe__readout" aria-live="polite">
+        <div><dt class="ui-label">How far into training</dt><dd id="p-frac">29%</dd></div>
+        <div><dt class="ui-label">Snapshots before · after</dt><dd id="p-around">15 · 15</dd></div>
+        <div><dt class="ui-label">Text read so far</dt><dd id="p-batch">86 billion word pieces</dd></div>
+        <div><dt class="ui-label">Counted in our study?</dt><dd><span class="verdict" id="p-verdict" data-kept="true">Yes</span></dd></div>
+      </dl>
+      <p class="probe__note" id="p-note">Counted: there are enough saved snapshots before and after this point to see whether reading the question made a difference.</p>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+
+  <section class="idea grid" id="idea" aria-labelledby="idea-h">
+    <div class="idea__text">
+      <h2 id="idea-h" class="section-h" data-reveal>The idea in a minute</h2>
+      <p class="idea__statement" data-reveal style="--d:1">A student’s grades rise all term. Did they learn the subject, or did they find last year’s exam?</p>
+      <p class="idea__body" data-reveal style="--d:2">A report card cannot tell the difference. AI test scores have the same problem. For one family of AI models we can check, because their makers published exactly what each model read, in what order, and saved copies of it along the way. So we can find test questions in its reading material, see when it read them, and watch whether its score on those questions suddenly jumps.</p>
+    </div>
+    <dl class="glossary" data-reveal style="--d:2" aria-label="Words used on this page">
+      <div><dt>Language model</dt><dd>An AI program that learns to write and answer questions by reading huge amounts of text. ChatGPT is one. Pythia is another.</dd></div>
+      <div><dt>Pythia</dt><dd>A family of open AI models from EleutherAI, a non-profit research group that published what each model read.</dd></div>
+      <div><dt>The Pile</dt><dd>The public collection of text Pythia read: books, websites, science papers, code and more.</dd></div>
+      <div><dt>Test</dt><dd>A fixed set of questions used to score AI models, like a standardized exam. Researchers call these benchmarks.</dd></div>
+      <div><dt>Training</dt><dd>The long process in which a model reads text and gradually improves. Pythia’s took 143,000 steps.</dd></div>
+      <div><dt>Snapshot</dt><dd>A saved copy of the model partway through training. Pythia’s makers saved 154 of them.</dd></div>
+    </dl>
+  </section>
+
+  <section class="ledger grid" aria-labelledby="ledger-h">
+    <div class="ledger__intro">
+      <h2 id="ledger-h" class="ledger__h" data-reveal><span>How the largest model</span><span>we study scores</span></h2>
+      <p class="ledger__note" data-reveal style="--d:1">Percent of questions answered correctly by Pythia 2.8B, the largest of the six models we study, once training finished. Each line also says what random guessing would score.</p>
+    </div>
+    <div class="ledger__rows" data-reveal style="--d:2">
+      <div class="ledger__row"><span class="ledger__whole">88</span><span class="ledger__dec">.2</span><p class="ledger__cap"><b>SciQ</b>: school science questions. Guessing scores 25.</p></div>
+      <div class="ledger__row"><span class="ledger__whole">73</span><span class="ledger__dec">.9</span><p class="ledger__cap"><b>PIQA</b>: everyday common sense. Guessing scores 50.</p></div>
+      <div class="ledger__row"><span class="ledger__whole">64</span><span class="ledger__dec">.7</span><p class="ledger__cap"><b>LAMBADA</b>: finish a story with its missing last word.</p></div>
+      <div class="ledger__row"><span class="ledger__whole">64</span><span class="ledger__dec">.4</span><p class="ledger__cap"><b>ARC-Easy</b>: grade-school science exams. Guessing scores 25.</p></div>
+      <div class="ledger__row ledger__row--out"><span class="ledger__whole">26</span><span class="ledger__dec">.1</span><p class="ledger__cap"><b>MMLU</b>: a hard university-level exam. Guessing scores 25, so we leave it out.</p></div>
+    </div>
+  </section>
+
+  <section class="show" id="scores" aria-labelledby="show-h">
+    <div class="show__inner">
+      <h2 id="show-h" class="section-h" data-reveal>How the scores grow during training</h2>
+      <p class="section-p" data-reveal style="--d:1">Each line is one size of model. Moving right means more training; higher means more questions right. The dashed line is what random guessing scores. Sizes are in parameters, the model’s adjustable settings: M is millions, B is billions. The left side is stretched so you can see the very start of training.</p>
+      <div class="panel" data-ui data-reveal style="--d:2">
+        <div class="panel__demo">
+          <div class="panel__caption">
+            <h3 id="curve-title">SciQ: percent correct</h3>
+            <div class="legend" id="curve-legend"></div>
+          </div>
+          <div class="chart" id="curve-chart" role="img" aria-labelledby="curve-title"></div>
+          <p class="panel__source">Scores published by <a class="link" href="https://github.com/EleutherAI/pythia/tree/a19eecb807ec2c79a39ebf18108816e6ffffc1d5/evals/pythia-v1">EleutherAI</a>, the makers of Pythia.</p>
+        </div>
+        <form class="panel__controls" id="curve-controls" aria-label="Chart options">
+          <fieldset class="ctl-group">
+            <legend>Test</legend>
+            <label class="ctl-row"><span>SciQ, science</span><span><span class="chance">guess 25%</span> <input type="radio" name="bench" value="sciq" checked></span></label>
+            <label class="ctl-row"><span>PIQA, common sense</span><span><span class="chance">guess 50%</span> <input type="radio" name="bench" value="piqa"></span></label>
+            <label class="ctl-row"><span>LAMBADA, last word</span><span><span class="chance">guess 0%</span> <input type="radio" name="bench" value="lambada"></span></label>
+            <label class="ctl-row"><span>ARC-Easy, science</span><span><span class="chance">guess 25%</span> <input type="radio" name="bench" value="arc_easy"></span></label>
+            <label class="ctl-row"><span>MMLU, left out</span><span><span class="chance">guess 25%</span> <input type="radio" name="bench" value="mmlu"></span></label>
+          </fieldset>
+          <fieldset class="ctl-group">
+            <legend>Reading material</legend>
+            <div class="seg">
+              <label><input type="radio" name="data" value="standard" checked>Original</label>
+              <label><input type="radio" name="data" value="deduped">Repeats removed</label>
+            </div>
+          </fieldset>
+          <fieldset class="ctl-group">
+            <legend>Show</legend>
+            <label class="ctl-row"><span>Guessing level</span><input type="checkbox" name="chance" checked></label>
+            <label class="ctl-row"><span>Margin of error</span><input type="checkbox" name="band" checked></label>
+          </fieldset>
+        </form>
+      </div>
+      <p class="show__start">Choose a test, then hover over or tap the chart to read exact numbers.</p>
+      <details class="table-view"><summary>Show the numbers as a table</summary><div class="scroll" id="curve-table"></div></details>
+    </div>
+  </section>
+
+  <section class="how" id="method" aria-labelledby="how-h">
+    <h2 id="how-h" class="section-h" data-reveal>How we will measure memory</h2>
+    <p class="section-p" data-reveal style="--d:1">The real measurement needs months of data work first. So here is our method running on practice data we made up, where we already know the right answer. This is not a result about Pythia yet.</p>
+    <div class="grid how__body">
+      <div class="how__steps">
+        <div class="how__step is-active" data-state="0">
+          <h3>First, track seen questions and look-alikes.</h3>
+          <p>For each test question we find in its reading material, we pick similar questions of the same difficulty that never appeared there. Then we track how confident the AI is in the right answer, snapshot by snapshot.</p>
+        </div>
+        <div class="how__step" data-state="1">
+          <h3>Then subtract the look-alikes.</h3>
+          <p>Both groups improve as the AI gets smarter in general. Subtracting one from the other removes that shared improvement, leaving only what reading the question added.</p>
+        </div>
+        <div class="how__step" data-state="2">
+          <h3>A jump right when it read the question is memory.</h3>
+          <p>If the gap opens exactly when the AI read the question, and not before, reading it caused the jump. On the practice data, the method finds the jump of 1.5 we planted.</p>
+        </div>
+      </div>
+      <div class="how__stage">
+        <div class="stage-card" data-ui>
+          <div class="panel__caption">
+            <h3 id="stage-title">Change in the AI’s confidence in the right answer</h3>
+            <div class="legend" id="stage-legend"></div>
+          </div>
+          <div class="chart" id="stage-chart" role="img" aria-labelledby="stage-title"></div>
+          <p class="panel__source">Practice data: 120 made-up questions the AI saw, and 360 it never saw. Across the bottom: snapshots before and after it read the question.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="proofs" id="checks" aria-labelledby="proofs-h">
+    <div class="proofs__inner">
+      <h2 id="proofs-h" class="section-h" data-reveal>What we have checked so far</h2>
+      <div class="proofs__list">
+        <article class="proof" data-reveal>
+          <div class="proof__panel" data-ui><div class="chart" id="chance-chart" style="--h:230px" role="img" aria-label="Final scores of the six models on five tests, against random guessing plus five points."></div></div>
+          <div>
+            <h3>Is the AI better than guessing?</h3>
+            <p>We only use tests where every model clearly beats random guessing, by at least five points. Each dot is a model (filled: original reading material, hollow: repeats removed); the black tick is guessing.</p>
+            <p>Using published scores, <b>four tests pass for all six models</b>. MMLU fails: the models are barely above guessing, so we leave it out. Two more tests, TriviaQA and SQuAD, have no published scores yet; we check those ourselves first.</p>
+          </div>
+        </article>
+        <article class="proof" data-reveal>
+          <div class="proof__panel" data-ui><div class="chart" id="sched-chart" style="--h:150px" role="img" aria-label="The 154 saved snapshots, the 27 with published scores and the 30 we test, along training."></div></div>
+          <div>
+            <h3>Thirty snapshots out of 154</h3>
+            <p>Pythia’s makers saved 154 snapshots of each model during training. We test 30 of them, more of them near the start, when the AI changes fastest.</p>
+            <p>Every model read <b>the same text in the same order</b>, about 2 million tokens (pieces of words) per training step.</p>
+          </div>
+        </article>
+        <article class="proof" data-reveal>
+          <div class="proof__panel" data-ui>
+            <table class="tiers">
+              <thead><tr><th>Group</th><th>What it means</th></tr></thead>
+              <tbody>
+                <tr><td><span class="tier"><i style="background:var(--series-1)"></i>Seen</span></td><td>The question and its answer appear word for word, 13 or more words in a row</td></tr>
+                <tr><td><span class="tier"><i style="background:var(--series-2)"></i>Probably seen</span></td><td>Very similar text, but not word for word</td></tr>
+                <tr><td><span class="tier"><i style="background:var(--axis)"></i>Not seen</span></td><td>Nothing similar found</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div>
+            <h3>Three levels of “seen”</h3>
+            <p>Anything in between is left out. Two people double-check about 100 questions in each group by hand.</p>
+            <p>If we miss a copy, a seen question gets counted as unseen. That makes the memory effect look <b>smaller than it really is, never bigger</b>.</p>
+          </div>
+        </article>
+        <article class="proof" data-reveal>
+          <div class="proof__panel" data-ui><div class="chart" id="irt-chart" style="--h:240px" role="img" aria-label="How hard each of 200 made-up questions really was, against how hard our model estimated it to be."></div></div>
+          <div>
+            <h3>Our statistics find a known answer</h3>
+            <p>Our second tool is a statistical model of test questions (item response theory) that rates how hard each question is and how much seeing it helps. We tested it on 200 made-up questions with a memory boost of 1.0 planted in.</p>
+            <p>It estimated <b><span id="irt-delta">0.985</span></b>. Each dot is a question: how hard it really was against our estimate. Dots near the dashed line mean the estimates are right.</p>
+            <p class="visually-hidden">Correlations: <span id="irt-cb">0.91</span> for difficulty, <span id="irt-ca">0.97</span> for ability.</p>
+          </div>
+        </article>
+        <article class="proof" data-reveal>
+          <div class="proof__panel" data-ui><div class="chart" id="pre-chart" style="--h:200px" role="img" aria-label="Practice data where seen questions were already rising before the AI read them; the warning region is shaded."></div></div>
+          <div>
+            <h3>It warns us when something is off</h3>
+            <p>If seen questions were already improving faster before the AI read them, a jump afterwards proves nothing. We made practice data with exactly that problem.</p>
+            <p>The warning fires: the early rise averages <b><span id="pre-val">−0.62</span></b> (range <span id="pre-ci">−0.68 to −0.56</span>), well away from zero. A real group like that would not be trusted.</p>
+          </div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="rows" id="predictions" aria-labelledby="rows-h">
+    <div class="grid rows__grid">
+      <div class="rows__intro">
+        <h2 id="rows-h" class="section-h" data-reveal>What we expect to find</h2>
+        <p data-reveal style="--d:1">We wrote these predictions down before seeing any results, so we cannot move the goalposts later. A prediction that turns out wrong is still a finding.</p>
+      </div>
+      <div class="rows__col" data-reveal style="--d:2">
+        <div class="rows__group">
+          <h3>Predictions</h3>
+          <ul>
+            <li class="row"><span class="row__dot row__dot--pending"></span><span class="row__name">Seeing a question makes it easier, right away<small>compared with look-alikes it never saw</small></span><span class="row__val" data-status="event_study">Not yet tested</span></li>
+            <li class="row"><span class="row__dot row__dot--pending"></span><span class="row__name">More copies seen, bigger boost<small>a question read five times helps more than once</small></span><span class="row__val" data-status="counterfactual">Not yet tested</span></li>
+            <li class="row"><span class="row__dot row__dot--pending"></span><span class="row__name">Raw scores and true skill tell different stories<small>about when the AI’s progress speeds up or stalls</small></span><span class="row__val" data-status="ability">Not yet tested</span></li>
+            <li class="row"><span class="row__dot row__dot--pending"></span><span class="row__name">Memory helps weaker and stronger models differently<small>so memory and skill do not simply add up</small></span><span class="row__val">Not yet tested</span></li>
+            <li class="row"><span class="row__dot row__dot--pending"></span><span class="row__name">Rewording a question removes part of the boost<small>new wording, names and numbers</small></span><span class="row__val" data-status="transfer">Not yet tested</span></li>
+          </ul>
+        </div>
+        <div class="rows__group">
+          <h3>Plan</h3>
+          <ul>
+            <li class="row"><span class="row__dot"></span><span class="row__name">Check the idea works, and count the seen questions</span><span class="row__val">Week 1</span></li>
+            <li class="row"><span class="row__dot"></span><span class="row__name">Find test questions in Pythia’s reading material</span><span class="row__val">Weeks 1–4</span></li>
+            <li class="row"><span class="row__dot"></span><span class="row__name">Score every snapshot of every model</span><span class="row__val">Weeks 1–5</span></li>
+            <li class="row"><span class="row__dot"></span><span class="row__name">Measure the memory effect</span><span class="row__val">Weeks 6–8</span></li>
+            <li class="row"><span class="row__dot"></span><span class="row__name">Stress-test it, including reworded questions</span><span class="row__val">Weeks 9–10</span></li>
+            <li class="row"><span class="row__dot"></span><span class="row__name">Write it up and present it</span><span class="row__val">Weeks 11–12</span></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="faq" id="questions" aria-labelledby="faq-h">
+    <h2 id="faq-h" class="section-h" data-reveal>Questions people ask</h2>
+    <div class="faq__list" data-reveal style="--d:1">
+      <details open>
+        <summary>Why does this matter?</summary>
+        <p>Test scores are how people track AI progress and compare models. If part of a rising score is memory, an AI can look more capable than it really is on problems it has never seen.</p>
+      </details>
+      <details>
+        <summary>Is the AI cheating?</summary>
+        <p>Not on purpose. Test questions get posted online, and online text ends up in what these models read. Nobody hands them the answers; they may simply have read them.</p>
+      </details>
+      <details>
+        <summary>Why Pythia and not ChatGPT?</summary>
+        <p>Pythia’s makers published exactly what it read, in what order, and saved snapshots along the way. That is what lets us check when it saw each question. Most commercial models do not share this.</p>
+      </details>
+      <details>
+        <summary>What have you found so far?</summary>
+        <p>No results yet. The charts above show test scores published by Pythia’s makers, and our method working on made-up practice data. Results will appear on this page when the analysis is done.</p>
+      </details>
+      <details>
+        <summary>Who is doing this?</summary>
+        <p>A student team in UofT AI’s Project X 2026, a research program at the University of Toronto. This year’s theme is “What is progress?”</p>
+      </details>
+    </div>
+  </section>
+
+  <section class="paper" id="proposal" aria-labelledby="paper-h" style="--n:4">
+    <div class="paper__track">
+      <div class="paper__stage">
+        <div class="paper__left">
+          <h2 id="paper-h" class="paper__h"><span>The full</span><span>plan</span></h2>
+          <ol class="paper__index" id="paper-index">
+            <li class="is-current"><button type="button" data-i="0">Why</button><span class="row__val">§1</span></li>
+            <li><button type="button" data-i="1">How</button><span class="row__val">§5</span></li>
+            <li><button type="button" data-i="2">Limits</button><span class="row__val">§7</span></li>
+            <li><button type="button" data-i="3">When</button><span class="row__val">§9</span></li>
+          </ol>
+        </div>
+        <div class="paper__right">
+          <article class="sheet is-current">
+            <p class="sheet__k">Why</p>
+            <p class="sheet__text">A rising score can mean the AI got smarter, or that it saw the test.</p>
+            <p class="sheet__more">The score alone cannot tell you which. Pythia is one of the few AI models where we can check, because we know what it read and when. The full proposal is written for researchers. <a class="link" href="proposal.html#1-motivation">Read section 1</a></p>
+          </article>
+          <article class="sheet">
+            <p class="sheet__k">How</p>
+            <p class="sheet__text">Find each test question in its reading, note when, and look for a jump.</p>
+            <p class="sheet__more">Two independent methods: the comparison with look-alike questions shown above, and a statistical model of how hard each question is. They should agree. <a class="link" href="proposal.html#5-method">Read section 5</a></p>
+          </article>
+          <article class="sheet">
+            <p class="sheet__k">Limits</p>
+            <p class="sheet__text">If we miss a copy, the memory effect looks smaller, never bigger.</p>
+            <p class="sheet__more">People check samples by hand, the early-rise warning guards the comparison, and results are split by when questions were read. <a class="link" href="proposal.html#7-threats-to-validity">Read section 7</a></p>
+          </article>
+          <article class="sheet">
+            <p class="sheet__k">When</p>
+            <p class="sheet__text">Twelve weeks, step by step. Each stage must pass before the next.</p>
+            <p class="sheet__more">The study goes ahead only if we find at least 200 seen questions with snapshots before and after; otherwise we widen the net and simplify. <a class="link" href="proposal.html#9-timeline">Read section 9</a></p>
+          </article>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="foot">
+  <div class="tile tile--statement">
+    <p>A student research project at the University of Toronto, part of UofT AI’s Project X 2026.</p>
+    <small>Code under the MIT licence. Pythia test scores © EleutherAI, Apache-2.0.</small>
+  </div>
+  <nav class="tile tile--nav" aria-label="Site">
+    <ul>
+      <li><a href="#idea">The idea</a></li>
+      <li><a href="#scores">Scores</a></li>
+      <li><a href="#method">Method</a></li>
+      <li><a href="#checks">Checks</a></li>
+      <li><a href="#questions">Questions</a></li>
+    </ul>
+  </nav>
+  <div class="tile tile--place">
+    <p>Toronto</p>
+    <p class="soft num" id="toronto-time">Eastern time</p>
+  </div>
+  <div class="tile tile--code">
+    <p class="soft" style="font-size:14px">Code and data</p>
+    <a class="link" href="https://github.com/Eternal128/ProjectX">github.com/Eternal128/ProjectX</a>
+  </div>
+  <div class="tile tile--mark"><p aria-hidden="true">Seen or Solved?</p></div>
+  <a class="tile tile--cta" href="proposal.html">
+    <p>Read the full proposal</p>
+    <svg viewBox="0 0 56 56" fill="none" stroke="currentColor" stroke-width="4" aria-hidden="true"><path d="M14 42 42 14M20 14h22v22"/></svg>
+  </a>
+</footer>
+
+<script src="assets/js/site.js" defer></script>
+</body>
+</html>

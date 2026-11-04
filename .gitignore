@@ -35,3 +35,9 @@ lm_eval_cache/
 .vscode/
 .idea/
 .DS_Store
+
+# design skill working files
+.taste-skill/
+
+# Vercel
+.vercel/

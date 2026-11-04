@@ -1,0 +1,439 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Proposal: Seen or Solved?</title>
+<meta name="description" content="Research proposal: how much of Pythia's benchmark progress over training comes from having seen the test questions.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%23a1ffcb' stroke='%23232323' stroke-width='6'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://api.fontshare.com">
+<link rel="preconnect" href="https://cdn.fontshare.com" crossorigin>
+<link href="https://api.fontshare.com/v2/css?f[]=clash-grotesk@400,500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/site.css">
+</head>
+<body>
+<a class="skip" href="#doc">Skip to content</a>
+<header class="doc-top">
+  <a class="wordmark" href="index.html"><span class="wordmark__dot" aria-hidden="true"></span>Seen or Solved?</a>
+  <a class="link" href="https://github.com/Eternal128/ProjectX/blob/main/docs/proposal.md">Source on GitHub</a>
+</header>
+<main class="doc" id="doc">
+<h1>Seen or Solved?</h1>
+<p class="doc-sub">Decomposing Language Model Progress into Memorization and Generalization</p>
+<p class="doc-note">This is the technical research proposal, written for researchers. For a plain-language overview, start on the <a href="index.html">home page</a>.</p>
+<p><strong>Project X 2026 (UofT AI), Research stream.</strong> Theme: <em>What is Progress?</em>
+<strong>Status:</strong> research proposal, 4 November 2026. Hypotheses are pre-registered (section 2); any later change
+is logged with a date and reason in <a href="https://github.com/Eternal128/ProjectX/blob/main/docs/prereg_changes.md"><code>prereg_changes.md</code></a>.</p>
+
+<h2 id="summary">Summary</h2>
+<p>A language model's benchmark score rises over training for two reasons that the score cannot tell
+apart: the model may have become more capable, or it may have seen the test items during training and
+recalled them. We measure how much of Pythia's benchmark progress over training is explained by
+exposure to benchmark items.</p>
+<p>Pythia is unusually well suited to this. Every model in the suite was trained on the same public
+corpus (the Pile) in the same fixed, published order, with 154 checkpoints saved along the way. That
+lets us find benchmark items in the training data, name the training step at which each one was
+first seen, and watch the model's performance on that item at checkpoints before and after.</p>
+<p>We combine two tools. <strong>Exposure detection</strong> finds benchmark items in the Pile and maps each match to
+the step where Pythia first trained on it. An <strong>exposure IRT model</strong>, checked by a model-free
+<strong>difference-in-differences event study</strong>, then estimates how much easier an item becomes after
+exposure and what share of measured progress that accounts for.</p>
+<p>The closest prior work is Lesci et al. (2024), who run difference-in-differences on Pythia for
+training sequences. We study benchmark items instead, their effect on measured progress, and add the
+exposure IRT model.</p>
+
+<h2 id="1-motivation">1. Motivation</h2>
+<p>Benchmark curves over training are the standard picture of "progress". If part of a curve's rise is
+recall of items that happened to appear in training data, the curve overstates capability, and the
+overstatement can grow or shrink as training proceeds. Contamination studies usually ask a static
+question (<em>is this item in the training data?</em>). We ask a dynamic one: <em>when the model sees an item,
+does its performance on that item jump, and how much of the curve do such jumps add up to?</em></p>
+<p>Answering it requires three things that rarely come together: the training data, its exact order,
+and many intermediate checkpoints. Pythia provides all three.</p>
+<h2 id="2-research-questions-and-pre-registered-hypotheses">2. Research questions and pre-registered hypotheses</h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Question</th>
+<th>Hypothesis</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>RQ1</td>
+<td>Does IRT ability tell a different story of progress than raw accuracy across Pythia's training?</td>
+<td><strong>H1.</strong> Accuracy and ability disagree on when progress speeds up or stalls.</td>
+</tr>
+<tr>
+<td>RQ2</td>
+<td>Does seeing an item in training cause a jump in performance on it?</td>
+<td><strong>H2.</strong> Log-probability of the correct answer rises sharply right after exposure, relative to matched clean items, with no pre-trend.</td>
+</tr>
+<tr>
+<td>RQ3</td>
+<td>How much of measured progress is explained by exposure?</td>
+<td><strong>H3.</strong> The exposure term is positive and grows with copy count within standard Pythia.</td>
+</tr>
+<tr>
+<td>RQ4</td>
+<td>Does the exposure effect depend on ability?</td>
+<td><strong>H4.</strong> The effect changes with ability, so memorization and generalization do not simply add up.</td>
+</tr>
+<tr>
+<td>RQ5</td>
+<td>Do exposure gains transfer to paraphrased items?</td>
+<td><strong>H5.</strong> Gains transfer only partly to paraphrases.</td>
+</tr>
+</tbody>
+</table>
+<p>Every hypothesis is a valid result if it fails. Thresholds are never tuned, and items are never
+dropped, to make a hypothesis pass.</p>
+<h2 id="3-related-work">3. Related work</h2>
+<ul>
+<li><strong>Lesci et al. (2024), <em>Causal Estimation of Memorisation Profiles</em> (ACL).</strong> Difference-in-differences
+  on Pythia checkpoints to estimate how much a model memorises the sequences it trains on. Our design
+  borrows their causal framing; we differ in studying benchmark items rather than training
+  sequences, in measuring the effect on benchmark progress, and in the exposure IRT model.</li>
+<li><strong>Biderman et al. (2023), Pythia.</strong> The model suite, checkpoints and reproducible data order we rely on.</li>
+<li><strong>Biderman et al. (2023); Carlini et al. (2023).</strong> Memorization in language models: what predicts it
+  and how it scales.</li>
+<li><strong>Liu et al. (2024), Infini-gram.</strong> Exact n-gram search over trillion-token corpora, used for
+  candidate retrieval in the Pile.</li>
+<li><strong>Polo et al. (2024), tinyBenchmarks.</strong> IRT applied to language-model benchmarks.</li>
+<li><strong>Schaeffer et al. (2023).</strong> Apparent "emergence" can be an artefact of the metric, one reason we model
+  continuous log-probability as well as binary accuracy.</li>
+</ul>
+<p>Only Lesci et al. has been checked against the source so far; the other references are to be
+verified before any citation in a write-up.</p>
+<h2 id="4-setting">4. Setting</h2>
+<h3 id="41-models">4.1 Models</h3>
+<p>Pythia 410M, 1.4B and 2.8B, each in two versions: trained on the standard Pile and on the deduplicated
+Pile. Checkpoints load from Hugging Face with <code>revision="stepN"</code>.</p>
+<p>From the Pythia repository README (checked 4 November 2026):</p>
+<ul>
+<li>All model sizes are trained on the exact same data in the exact same order.</li>
+<li>Each model saw 299,892,736,000 tokens: 143,000 steps at a batch of 2,097,152 tokens, that is 1,024
+  sequences of 2,048 tokens (stored as 2,049-token rows so targets can be shifted).</li>
+<li>The standard models see just under one epoch of the Pile; the deduplicated models see about 1.5
+  epochs of the 207B-token deduplicated Pile.</li>
+<li>154 checkpoints per model: steps 0, 1, 2, 4, 8, …, 512, 1000, and every 1,000 steps after that.</li>
+<li>The preshuffled, pre-tokenized training data is public (<code>EleutherAI/pile-standard-pythia-preshuffled</code>
+  and <code>EleutherAI/pile-deduped-pythia-preshuffled</code>), with a batch viewer that reads rows
+  <code>step × 1024</code> to <code>(step + 1) × 1024</code> for a given training step.</li>
+</ul>
+<h3 id="42-checkpoints">4.2 Checkpoints</h3>
+<p>We evaluate 30 checkpoints per model, denser early in training, all inside the documented
+schedule: 512, 1000, 2000, 3000, 4000, 6000, 8000, 10000, 13000, 16000, 20000, 24000, 28000, 33000,
+38000, 43000, 49000, 55000, 61000, 68000, 75000, 82000, 90000, 98000, 106000, 114000, 122000, 130000,
+137000 and 143000 (<code>configs/models.yaml</code>). Before the main run we confirm each revision exists on the
+Hugging Face hub (<code>python -m evals.list_checkpoints</code>).</p>
+<h3 id="43-benchmarks">4.3 Benchmarks</h3>
+<p>Each benchmark must have been public before the Pile was released (end of 2020), and Pythia must score
+clearly above chance on it: at least 5 points above chance with a one-sided test against chance at
+p &lt; 0.01 (<code>configs/benchmarks.yaml</code>).</p>
+<p>Candidates: TriviaQA (2017), SQuAD (2016), LAMBADA (2016), ARC-Easy (2018), SciQ (2017), PIQA (2019),
+with years from each paper's first arXiv version. Excluded on purpose: GSM8K (released 2021, so it
+cannot be in the Pile) and MMLU (near chance at this scale; see below).</p>
+<p><strong>Above-chance check from published results.</strong> EleutherAI publishes zero-shot accuracy for every
+Pythia model at 27 checkpoints (lm-evaluation-harness, Apache-2.0, commit <code>a19eecb</code>). They cover four
+of our candidates and MMLU. Final-checkpoint accuracy:</p>
+<table>
+<thead>
+<tr>
+<th>Benchmark</th>
+<th>Chance</th>
+<th>410m</th>
+<th>410m-deduped</th>
+<th>1.4b</th>
+<th>1.4b-deduped</th>
+<th>2.8b</th>
+<th>2.8b-deduped</th>
+<th>Passes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>LAMBADA</td>
+<td>0.00</td>
+<td>0.516</td>
+<td>0.524</td>
+<td>0.616</td>
+<td>0.619</td>
+<td>0.647</td>
+<td>0.651</td>
+<td>all six</td>
+</tr>
+<tr>
+<td>PIQA</td>
+<td>0.50</td>
+<td>0.668</td>
+<td>0.675</td>
+<td>0.709</td>
+<td>0.720</td>
+<td>0.739</td>
+<td>0.741</td>
+<td>all six</td>
+</tr>
+<tr>
+<td>SciQ</td>
+<td>0.25</td>
+<td>0.811</td>
+<td>0.826</td>
+<td>0.865</td>
+<td>0.865</td>
+<td>0.882</td>
+<td>0.882</td>
+<td>all six</td>
+</tr>
+<tr>
+<td>ARC-Easy</td>
+<td>0.25</td>
+<td>0.521</td>
+<td>0.517</td>
+<td>0.607</td>
+<td>0.617</td>
+<td>0.644</td>
+<td>0.635</td>
+<td>all six</td>
+</tr>
+<tr>
+<td>MMLU</td>
+<td>0.25</td>
+<td>0.255</td>
+<td>0.253</td>
+<td>0.269</td>
+<td>0.266</td>
+<td>0.261</td>
+<td>0.262</td>
+<td>none</td>
+</tr>
+</tbody>
+</table>
+<p>LAMBADA's chance level is taken as zero because the answer is an open-vocabulary word. MMLU is the
+unweighted mean of its 57 subjects; no model clears the 5-point margin, which confirms the
+exclusion. TriviaQA and SQuAD are not in the published results and are checked in week 1 with our own
+evaluation. These are EleutherAI's aggregate numbers, used only for this screening step; the study
+itself uses our own per-item evaluations. (<code>python -m evals.pythia_published</code> regenerates the table.)</p>
+<h2 id="5-method">5. Method</h2>
+<h3 id="51-exposure-detection">5.1 Exposure detection</h3>
+<ol>
+<li><strong>Candidate retrieval.</strong> Query infini-gram over the Pile with long n-grams (13 or more tokens) from
+   each question and each answer, plus one span that joins the end of the question to the answer, and
+   shorter n-grams for a wider candidate set.</li>
+<li><strong>Semantic check.</strong> Embed each candidate passage and the item with an open sentence-embedding model
+   and store their cosine similarity.</li>
+<li><strong>Tiers.</strong> <code>confirmed</code>: a long exact match covering both question and answer. <code>likely</code>: high semantic
+   similarity with no exact match. <code>clean</code>: no candidate above a low similarity threshold. Items in
+   between are <code>ambiguous</code> and left out of both groups.</li>
+<li><strong>Hand validation.</strong> Two people label a random sample of about 100 items per tier; we report precision
+   per tier.</li>
+</ol>
+<p>Missed exposure puts seen items in the clean group, which biases every effect toward zero. We state
+this wherever results are reported.</p>
+<h3 id="52-step-mapping">5.2 Step mapping</h3>
+<p>Infini-gram returns positions in the Pile, not training steps. Training step <em>b</em> consumes rows
+<em>1024·b</em> to <em>1024·(b+1) − 1</em> of the preshuffled data, so a matched token span maps to the batch that
+contains it. Checkpoint <code>stepN</code> has seen batches 0 to N − 1, so we define the first-exposure step as
+<strong>t0 = first batch + 1</strong>, the exposure indicator as <strong>E(t) = 1 when t ≥ t0</strong>, and the running copy count
+<strong>n(t)</strong> as the number of occurrences in batches before <em>t</em>. The off-by-one is confirmed against the
+batch viewer before the first real run.</p>
+<p>Two ways to locate matches in training order are compared in week 1: (a) search the preshuffled token
+files directly with a multi-pattern matcher, which also yields copy counts; or (b) map Pile document
+indices to the shuffled order, if the tooling allows. The choice and its storage and time cost are
+recorded in <a href="https://github.com/Eternal128/ProjectX/blob/main/docs/step_mapping.md"><code>step_mapping.md</code></a>.</p>
+<h3 id="53-timing-filter">5.3 Timing filter</h3>
+<p>A confirmed item enters the event study only if at least three evaluated checkpoints come before its
+t0 and t0 falls between 10% and 90% of training. All results are reported stratified by t0.</p>
+<h3 id="54-checkpoint-evaluation">5.4 Checkpoint evaluation</h3>
+<p>EleutherAI's lm-evaluation-harness with per-sample logging. For every model, checkpoint and item we
+store binary correctness <strong>y</strong> and the log-probability of the correct answer <strong>logp</strong>, in one table with
+columns <code>model, data_version, step, benchmark, item_id, y, logp, tier, t0, n</code>. Seeds and library
+versions are pinned. <strong>The inputs are never mixed:</strong> the IRT model uses y only; the event study uses
+logp only.</p>
+<h3 id="55-exposure-irt">5.5 Exposure IRT</h3>
+<p>For item <em>i</em>, model <em>m</em> and checkpoint <em>t</em>:</p>
+<pre><code>P(y_imt = 1) = sigmoid( a_i · (θ_mt − b_i + δ_imt · E_imt) )
+δ_imt        = δ_0 + δ_1 · log(1 + n_it) + δ_2 · θ_mt
+</code></pre>
+<p>θ_mt is the ability of one model at one checkpoint, with a Normal(0, 1) prior that fixes the scale;
+b_i is base difficulty; a_i &gt; 0 is discrimination; δ_1 is the dose term (copy count) and δ_2 the
+ability interaction, the first term dropped if anything fails to fit. A standard 2PL model without the
+exposure term is fitted for comparison (RQ1).</p>
+<p>Fitting proceeds one step at a time, each gated on the previous: (1) MAP with a single shared δ on
+simulated data, with a parameter-recovery test; (2) dose and ability terms added, recovery tested
+again; (3) stochastic variational inference on real data for approximate uncertainty; (4) full NUTS
+on a random subset of items, only to confirm the variational intervals.</p>
+<h3 id="56-event-study">5.6 Event study</h3>
+<p>Each confirmed item is matched to clean items from the same benchmark with similar base difficulty,
+measured as mean logp over checkpoints in the first 10% of training (before any eligible t0). With
+event time <em>k</em> counted in checkpoints from exposure:</p>
+<pre><code>Effect(k) = [mean_exp(t0+k) − mean_exp(t0−1)] − [mean_clean(t0+k) − mean_clean(t0−1)]
+</code></pre>
+<p>with 95% confidence intervals from a bootstrap over items. <strong>Pre-trend test:</strong> if exposed items were
+already rising faster than their matches before t0 (the bootstrap interval of the mean pre-period
+effect excludes zero), that group's estimate is not read causally, and we say so.</p>
+<h3 id="57-exposure-share-of-progress">5.7 Exposure share of progress</h3>
+<p>From the fitted IRT model, the counterfactual accuracy with every E set to zero gives</p>
+<pre><code>M = (ΔAcc_observed − ΔAcc_E0) / ΔAcc_observed
+</code></pre>
+<p>the share of the observed accuracy gain explained by exposure (RQ3).</p>
+<h3 id="58-robustness">5.8 Robustness</h3>
+<ul>
+<li>Add the <code>likely</code> tier to each side (exposed, then clean) in turn.</li>
+<li><strong>Transfer (RQ5):</strong> paraphrase a sample of confirmed items with new wording, names and numbers, and
+  compare their gains with the originals'.</li>
+<li><strong>Dose:</strong> the main dose measure is copy count within standard Pythia. The deduplicated run is a
+  secondary check only, because deduplication changed the whole data distribution, not just the copies.</li>
+</ul>
+<h2 id="6-preliminary-work">6. Preliminary work</h2>
+<p><strong>Code.</strong> The repository contains the full pipeline: exposure detection and step mapping, the
+evaluation wrapper and table schema, the IRT models in NumPyro, the event study, and one script per
+figure. Every run is driven by a config file and records its config hash and git commit. 27 unit
+tests pass, including the IRT recovery tests required by fitting steps 1 and 2.</p>
+<p><strong>Benchmark curves.</strong> The published results above also give accuracy over training at 27 checkpoints
+for each benchmark and model. They rise steadily for all four candidate benchmarks and stay flat near
+chance for MMLU. We use them only to describe the benchmarks; no threshold or hypothesis depends on
+them.</p>
+<p><strong>Method checks on simulated data.</strong> Our own code, run on simulated data with known effects
+(<code>python -m figures.site_methods</code>):</p>
+<ul>
+<li><em>Event study.</em> 120 exposed and 360 clean simulated items on the real 30-checkpoint schedule, with a
+  planted jump of 1.5 in log-probability at exposure and no pre-trend. The estimated effect after
+  exposure is between 1.41 and 1.50 at every event time from 0 to 8; before exposure it stays within
+  ±0.06 of zero, and the pre-trend test does not fire.</li>
+<li><em>Pre-trend detection.</em> The same panel with a planted pre-exposure rise: the test flags it (mean
+  pre-period effect −0.62, 95% interval −0.68 to −0.56).</li>
+<li><em>Exposure IRT.</em> 200 simulated items, two models and 20 checkpoints with a planted δ_0 = 1.0: MAP
+  recovers δ_0 = 0.985, with correlations of 0.91 for item difficulty and 0.97 for ability.</li>
+</ul>
+<p>These show the estimators recover what is planted. They say nothing yet about Pythia.</p>
+<h2 id="7-threats-to-validity">7. Threats to validity</h2>
+<ul>
+<li><strong>Missed exposure</strong> (paraphrased, reformatted or translated copies) puts seen items in the clean
+  group and biases effects toward zero. Hand validation of the clean tier bounds this.</li>
+<li><strong>False matches</strong> in the confirmed tier (generic questions with common answers) dilute the effect.
+  The confirmed tier requires question and answer together; hand validation reports its precision.</li>
+<li><strong>Selection by timing.</strong> The timing filter keeps items first seen mid-training, which may differ from
+  items seen early or late. Results are stratified by t0.</li>
+<li><strong>Matching.</strong> Matched clean items may differ from exposed ones in ways difficulty does not capture;
+  the pre-trend test is the main guard.</li>
+<li><strong>Harness details.</strong> Prompt format and scoring affect accuracy. We pin versions, and use log-probability
+  as well as accuracy so that conclusions do not rest on a threshold metric.</li>
+<li><strong>Deduplication</strong> changes the whole training distribution, so standard-versus-deduplicated
+  comparisons are secondary evidence only.</li>
+</ul>
+<h2 id="8-go-no-go-gate">8. Go / no-go gate</h2>
+<p>The main analysis needs at least <strong>200 confirmed exposed items that pass the timing filter</strong>. If fewer,
+the <code>likely</code> tier moves into the main analysis and the ability interaction δ_2 is dropped. The count
+and decision are recorded in <code>prereg_changes.md</code> at the end of week 1.</p>
+<h2 id="9-timeline">9. Timeline</h2>
+<table>
+<thead>
+<tr>
+<th>Weeks</th>
+<th>Phase</th>
+<th>Main outputs</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Feasibility</td>
+<td>Smoke test; above-chance check for TriviaQA and SQuAD; step-mapping method and cost; go / no-go count</td>
+</tr>
+<tr>
+<td>1–4</td>
+<td>Exposure detection</td>
+<td>Candidates, similarity, tiers, t0 and copy counts for both data versions; hand validation</td>
+</tr>
+<tr>
+<td>1–5</td>
+<td>Checkpoint evaluation</td>
+<td>y and logp for 6 models × 30 checkpoints × all items</td>
+</tr>
+<tr>
+<td>6–8</td>
+<td>Models</td>
+<td>Exposure IRT (recovery first, then real data); standard 2PL; event study with pre-trend tests</td>
+</tr>
+<tr>
+<td>9–10</td>
+<td>Robustness</td>
+<td>Likely-tier sensitivity; paraphrase transfer; exposure share of progress</td>
+</tr>
+<tr>
+<td>11</td>
+<td>Stretch</td>
+<td>Held-out questions on newer models, or crosscoders on two checkpoints (nothing core depends on these)</td>
+</tr>
+<tr>
+<td>12</td>
+<td>Write-up</td>
+<td>Paper and talk; every figure rebuilt from data with one command</td>
+</tr>
+</tbody>
+</table>
+<p>Gates are hard stops: a phase does not start until the previous gate passes or its fallback is
+written down.</p>
+<h2 id="10-compute">10. Compute</h2>
+<p>About 50 to 100 GPU hours, almost all of it checkpoint evaluation; we start with Pythia 410M while
+GPU access is arranged and flag anything likely to exceed the budget. Exposure detection uses the
+public infini-gram service and CPU-side search of the preshuffled data.</p>
+<h2 id="11-team">11. Team</h2>
+<table>
+<thead>
+<tr>
+<th>Role</th>
+<th>Owns</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Data lead</td>
+<td>Retrieval, embedding check, tiers, step mapping</td>
+</tr>
+<tr>
+<td>Validation lead</td>
+<td>Hand validation, matched clean items, paraphrases</td>
+</tr>
+<tr>
+<td>Evaluation lead</td>
+<td>Checkpoint evaluation, compute</td>
+</tr>
+<tr>
+<td>Statistics lead</td>
+<td>Exposure IRT, event study, counterfactual, figures</td>
+</tr>
+</tbody>
+</table>
+<h2 id="12-deliverables">12. Deliverables</h2>
+<ol>
+<li><strong>Main figure:</strong> the event study, mean logp change for exposed against matched clean items across
+   checkpoints before and after exposure. It must be readable without trusting any fitted model.</li>
+<li><strong>Second figure:</strong> observed accuracy over training next to the exposure-removed counterfactual, gap
+   shaded.</li>
+<li>The code, configs and a one-command rebuild of every figure; the project website
+   (https://projectx-psi-five.vercel.app/).</li>
+</ol>
+<h2 id="references">References</h2>
+<ul>
+<li>Lesci, P., Meister, C., Hofmann, T., Vlachos, A. and Pimentel, T. (2024). Causal Estimation of
+  Memorisation Profiles. ACL. https://aclanthology.org/2024.acl-long.834.pdf</li>
+<li>Biderman, S. et al. (2023). Pythia: A Suite for Analyzing Large Language Models Across Training and
+  Scaling. ICML.</li>
+<li>Biderman, S. et al. (2023). Emergent and Predictable Memorization in Large Language Models. NeurIPS.</li>
+<li>Carlini, N. et al. (2023). Quantifying Memorization Across Neural Language Models. ICLR.</li>
+<li>Liu, J. et al. (2024). Infini-gram: Scaling Unbounded n-gram Language Models to a Trillion Tokens. COLM.</li>
+<li>Mirzadeh, I. et al. (2024). GSM-Symbolic. arXiv.</li>
+<li>Polo, F. M. et al. (2024). tinyBenchmarks. ICML.</li>
+<li>Schaeffer, R., Miranda, B. and Koyejo, S. (2023). Are Emergent Abilities of Large Language Models a
+  Mirage? NeurIPS.</li>
+<li>EleutherAI. Pythia repository and published evaluation results, commit <code>a19eecb</code>.
+  https://github.com/EleutherAI/pythia</li>
+</ul>
+<p>All references except Lesci et al. and the Pythia repository were written from memory and are to be
+verified before citing.</p>
+</main>
+</body>
+</html>
