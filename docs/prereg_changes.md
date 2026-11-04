@@ -26,9 +26,14 @@ To be filled in during week 1 (AGENTS.md, Phase 0 step 2). One row per candidate
 
 | Benchmark | Chance | Final-checkpoint accuracy (pythia-410m) | Keep / drop |
 | --- | --- | --- | --- |
-| TriviaQA | 0 | TBD | TBD |
-| SQuAD | 0 | TBD | TBD |
-| LAMBADA | 0 | TBD | TBD |
-| ARC-Easy | 0.25 | TBD | TBD |
-| SciQ | 0.25 | TBD | TBD |
-| PIQA | 0.5 | TBD | TBD |
+| TriviaQA | 0 | TBD (not in published results) | TBD |
+| SQuAD | 0 | TBD (not in published results) | TBD |
+| LAMBADA | 0 | 0.516 (published) | keep, provisional |
+| ARC-Easy | 0.25 | 0.521 (published) | keep, provisional |
+| SciQ | 0.25 | 0.811 (published) | keep, provisional |
+| PIQA | 0.5 | 0.668 (published) | keep, provisional |
+
+"Published" numbers are EleutherAI's zero-shot results for `pythia-410m` at step 143000 (Pythia
+repository, commit `a19eecb`; `python -m evals.pythia_published`). Under the rule in
+`configs/benchmarks.yaml` all four pass for all six study models, and MMLU passes for none, which
+confirms its exclusion. Logged 2026-11-04; to be confirmed with our own evaluation in week 1.
