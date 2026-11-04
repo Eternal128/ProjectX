@@ -151,6 +151,21 @@ svg { display: block; }
   .hero__toplink { top: 22px; right: 20px; }
 }
 
+/* ---------- the idea: statement and glossary ---------- */
+.idea { padding: var(--section) var(--m) 0; align-items: start; row-gap: 48px; }
+.idea__text { grid-column: 1 / 7; }
+.idea__statement { margin-top: 20px; font-size: var(--step-statement); line-height: 1.15; letter-spacing: -0.02em; max-width: 30ch; }
+.idea__body { margin-top: 24px; max-width: 46ch; }
+.glossary { grid-column: 8 / 13; display: grid; gap: 4px; }
+.glossary { gap: 0 !important; }
+.glossary > div { display: grid; grid-template-columns: 9.5rem minmax(0, 1fr); gap: 16px; padding: 12px 0; }
+.glossary dt { font-weight: 500; }
+.glossary dd { line-height: 1.4; }
+@media (max-width: 900px) {
+  .idea__text, .glossary { grid-column: 1 / -1; }
+  .glossary > div { grid-template-columns: 1fr; gap: 4px; }
+}
+
 /* ---------- ledger: column aligned on the decimal ---------- */
 .ledger { padding: var(--section) var(--m) 0; align-items: center; }
 .ledger__intro { grid-column: 1 / 6; }
@@ -277,9 +292,23 @@ fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
   .row { min-height: 44px; }
 }
 
+/* ---------- questions people ask ---------- */
+.faq { padding: var(--section) var(--m) 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 760px) minmax(0, 1fr); }
+.faq > * { grid-column: 2; }
+.faq__list { margin-top: 32px; display: grid; gap: 6px; }
+.faq__list { gap: 0; }
+.faq details { border-radius: var(--r); padding: 0 20px; margin: 0 -20px; transition: background-color var(--t-hover) ease; }
+.faq details[open] { background: var(--surface); }
+.faq summary { cursor: pointer; list-style: none; display: flex; justify-content: space-between; align-items: center; gap: 16px; min-height: 64px; font-size: var(--step-lead); font-weight: 500; letter-spacing: -0.01em; }
+.faq summary::-webkit-details-marker { display: none; }
+.faq summary::after { content: "+"; font-size: 1.5em; line-height: 1; transition: transform var(--t-ui) var(--ease-out); }
+.faq details[open] summary::after { transform: rotate(45deg); }
+.faq details p { padding: 0 0 22px; max-width: 60ch; }
+@media (max-width: 900px) { .faq { display: block; } .faq details { padding: 0 12px; margin: 0 -12px; } }
+
 /* ---------- proposal: small index, large picture ---------- */
 .paper { margin-top: var(--section); position: relative; }
-.paper__track { height: calc(var(--n) * 80svh + 20svh); }
+.paper__track { height: calc(var(--n) * 62svh + 38svh); }
 .paper__stage { position: sticky; top: 0; height: 100svh; display: grid; grid-template-columns: 38fr 62fr; }
 .paper__left { display: flex; flex-direction: column; justify-content: space-between; padding: 40px var(--m) 32px; }
 .paper__h { font-size: var(--step-figure); line-height: 0.95; letter-spacing: -0.04em; }
@@ -345,6 +374,7 @@ fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
 .doc { padding: 40px var(--m) var(--section); display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 720px) minmax(0, 1fr); }
 .doc > * { grid-column: 2; }
 .doc h1 { font-size: clamp(2rem, 1.2rem + 2.4vw, 3.25rem); line-height: 1.02; letter-spacing: -0.03em; margin-bottom: 16px; }
+.doc .doc-note { background: var(--accent); padding: 14px 18px; border-radius: var(--r); margin-bottom: 32px; }
 .doc .doc-sub { font-size: var(--step-lead); line-height: 1.25; margin-bottom: 32px; color: var(--muted); }
 .doc h2 { font-size: 1.75rem; margin: 64px 0 16px; }
 .doc h3 { font-size: 1.25rem; margin: 36px 0 12px; }
