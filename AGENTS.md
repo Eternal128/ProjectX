@@ -156,6 +156,7 @@ One script per figure in `src/figures/`, reading only from `data/`. Every figure
 - Never look at final results before the analysis code and thresholds are fixed. Write analysis code against a small development split first.
 - Notebooks are for exploration. Anything a result depends on lives in `src/` with a test.
 - Branches are named `<your-name>/<feature-name>` in short kebab-case, e.g. `james/step-mapping`.
+- Commits are authored as the team member's own GitHub identity. Never add AI co-author or session trailers (for example `Co-Authored-By: Claude` or `Claude-Session:`) to commits, and no AI attribution lines in pull request descriptions.
 - Commit messages say what changed and why. Open a pull request for any change to `src/irt/` or `src/event_study/`, reviewed by the statistics lead.
 - Keep compute in check. The core project should need about 50 to 100 GPU hours, mostly checkpoint evaluation. Flag anything that looks like it will exceed that.
 
