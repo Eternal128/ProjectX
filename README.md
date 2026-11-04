@@ -20,6 +20,7 @@ their effect on measured progress, and add the exposure IRT model.
 - Full plan, hypotheses and conventions: [`AGENTS.md`](AGENTS.md) (read this first).
 - Proposal: [`docs/proposal.md`](docs/proposal.md).
 - Changes to hypotheses or thresholds: [`docs/prereg_changes.md`](docs/prereg_changes.md).
+- Project website: https://projectx-psi-five.vercel.app/ (source in `site/`, notes in [`docs/site.md`](docs/site.md)).
 
 ## Setup
 

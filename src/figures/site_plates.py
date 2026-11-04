@@ -1,6 +1,6 @@
-"""Draw the site's plates (flat SVG drawings in the palette's colours).
+"""Draw the website's plates (flat SVG drawings in the palette's colours).
 
-    python site/tools/plates.py
+    python src/figures/site_plates.py
 
 Writes site/assets/img/*.svg. These stand in for photographs until real archival
 pictures can be fetched (see site/README.md).
@@ -11,7 +11,7 @@ import math
 import random
 from pathlib import Path
 
-OUT = Path(__file__).resolve().parents[1] / "assets" / "img"
+OUT = Path(__file__).resolve().parents[2] / "site" / "assets" / "img"
 INK, MUTED, DEEP, BONE, SURF, SURF2 = "#38450f", "#5d683a", "#232b09", "#ecebe7", "#e1dfd9", "#d5d3cb"
 
 
