@@ -1,7 +1,26 @@
 # Project website
 
-Static site for *Seen or Solved?* in `site/`: no build step, plain HTML, CSS and JavaScript.
-Everything in `site/` is public. It is hosted on Vercel: https://projectx-psi-five.vercel.app/
+Static site for *Seen or Solved?* in `site/`: plain HTML, CSS and JavaScript, no build step.
+Everything in `site/` is public. Hosted on Vercel: https://projectx-psi-five.vercel.app/
+
+- `site/index.html`: the study, with interactive charts.
+- `site/proposal.html`: the full proposal, rendered from `docs/proposal.md`.
+- `site/data/*.json`: the data behind every chart, written by scripts in `src/` (below).
+
+Design: light theme, Clash Grotesk (loaded from Fontshare), greys with a mint accent; every chart is a
+working SVG fragment with hover values and a table for screen readers. Chart colours are the dataviz
+reference palette's first three slots, validated colour-blind safe for all pairs.
+
+## What the charts show
+
+| Data file | Written by | What it is |
+| --- | --- | --- |
+| `benchmarks.json` | `python -m evals.pythia_published` | **Real.** EleutherAI's published zero-shot accuracy for the six study models at 27 checkpoints (Pythia repo, pinned commit, Apache-2.0), plus the above-chance check. Not our own per-item evaluation. |
+| `methods.json` | `python -m figures.site_methods` | **Simulated.** Our event-study and IRT code run on simulated data with planted effects, to show the estimators recover them. Not results about Pythia. |
+| `results.json` | `python -m figures.site_data` | Study results. Every block stays "pending" until `data/results/` has outputs. Run only after the analysis is frozen. |
+
+After editing `docs/proposal.md`, regenerate the page with `python -m figures.site_proposal`
+(needs `pip install -e ".[site]"`).
 
 ## Preview locally
 
@@ -9,51 +28,11 @@ Everything in `site/` is public. It is hosted on Vercel: https://projectx-psi-fi
 python -m http.server -d site 8000   # then open http://localhost:8000
 ```
 
-Opening `index.html` straight from disk also works, but results then always show as pending
-(browsers block reading `data/results.json` from `file://`).
+Charts read `site/data/*.json` with `fetch`, so open the site through a server, not straight from disk.
 
 ## Deploy (Vercel)
 
-The repository is connected to a Vercel project. `vercel.json` at the repo root tells Vercel this is a
-static site served from `site/`, with no install or build step (so Vercel does not treat
-`pyproject.toml` as a Python app).
-
-- Every push to `main` deploys production at the URL above.
-- Every other branch and every pull request gets its own preview deployment; Vercel posts the link
-  on the pull request.
-- In the Vercel project settings, leave **Root Directory** empty (the repository root) and the
-  framework preset as **Other**; `vercel.json` overrides the build settings.
-
-To check a change before pushing: `npx vercel build` builds the same output into `.vercel/output/`.
-
-## Results
-
-Every result on the page is **pending** until `site/data/results.json` says otherwise. That file is
-written from `data/` and `configs/` only:
-
-```bash
-python -m figures.fig_event_study --config configs/event_study.yaml   # also writes an .svg
-python -m figures.fig_counterfactual --config configs/irt.yaml
-python -m figures.site_data                                           # writes site/data/results.json
-```
-
-Run `figures.site_data` only after the analysis code and thresholds are frozen (AGENTS.md): it
-publishes whatever is in `data/results/`. The timing explorer reads the checkpoint list and timing
-filter from the same file, so it follows `configs/models.yaml` and `configs/exposure.yaml`.
-
-## Pictures
-
-All pictures are flat drawings made for the site by `src/figures/site_plates.py`
-(`python src/figures/site_plates.py` redraws them into `site/assets/img/`). Archival pictures would be
-stronger and could not be fetched when the site was built (the build environment's network blocked
-the open image collections). Good candidates, all to be checked for licence and credited in the footer:
-
-- the Aegeus kylix (Antikensammlung Berlin), the only ancient image of the Pythia at work, for the hero;
-- John Collier, *Priestess of Delphi* (1891, public domain), for the tall intro picture;
-- photographs of the Temple of Apollo and the Delphic tripod for the hero and intro;
-- an archival photograph of a paper archive or library stack for the "When Pythia read it" picture.
-
-## Sample content
-
-The example questions on the benchmark cards are written for this page in each benchmark's format;
-they are not items from the benchmarks. Swap in real items (with the dataset licence noted) if wanted.
+`vercel.json` at the repo root serves `site/` as a static site with no install or build step. Pushes to
+`main` deploy production; other branches and pull requests get preview deployments. In the Vercel
+project settings leave Root Directory empty and the framework preset on "Other".
+`npx vercel build` builds the same output locally into `.vercel/output/`.

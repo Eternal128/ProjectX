@@ -55,6 +55,30 @@ def simulated_panel(steps, total, jump, pretrend, n_exp=120, n_clean=360, seed=0
     return df, exp, clean
 
 
+def group_curves(df, exposed, matches, pre, post, reference=-1):
+    """Mean change in logp since the reference checkpoint, for exposed items and for their
+    matched clean items, by event time (the two terms of the difference-in-differences)."""
+    wide = df.pivot_table(index=["benchmark", "item_id"], columns="step", values="logp")
+    steps = np.asarray(wide.columns)
+    ks = np.arange(-pre, post + 1)
+    groups = matches.groupby(["benchmark", "item_id"])["clean_item_id"].apply(list)
+    exp_rows, clean_rows = [], []
+    for bench, item, t0 in exposed[["benchmark", "item_id", "t0"]].itertuples(index=False):
+        pos0 = int(np.searchsorted(steps, t0, side="left"))
+        pos, ref = pos0 + ks, pos0 + reference
+        valid = (pos >= 0) & (pos < len(steps))
+        e = np.full(len(ks), np.nan)
+        c = np.full(len(ks), np.nan)
+        row = wide.loc[(bench, item)].to_numpy()
+        cm = wide.loc[[(bench, x) for x in groups[(bench, item)]]].to_numpy().mean(axis=0)
+        e[valid] = row[pos[valid]] - row[ref]
+        c[valid] = cm[pos[valid]] - cm[ref]
+        exp_rows.append(e)
+        clean_rows.append(c)
+    em, cm_ = np.nanmean(exp_rows, axis=0), np.nanmean(clean_rows, axis=0)
+    return [[int(k), round(float(a), 3), round(float(b), 3)] for k, a, b in zip(ks, em, cm_)]
+
+
 def run_event_study(cfg, steps, total, jump, pretrend, seed):
     df, exp, clean = simulated_panel(steps, total, jump, pretrend, seed=seed)
     diff = base_difficulty(df, cfg["matching"]["difficulty_max_step_fraction"] * total)
@@ -63,6 +87,7 @@ def run_event_study(cfg, steps, total, jump, pretrend, seed):
     d = item_effects(df, exp, matches, w["pre"], w["post"], w["reference"])
     res = estimate(d, reps=1000, level=cfg["bootstrap"]["level"], reference=w["reference"], seed=seed)
     return {
+        "groups": group_curves(df, exp, matches, w["pre"], w["post"], w["reference"]),
         "planted_jump": jump, "planted_pretrend_per_checkpoint": pretrend, "n_exposed": int(len(d)),
         "effects": [[int(r.k), round(r.effect, 3), round(r.ci_low, 3), round(r.ci_high, 3), int(r.n_items)]
                     for r in res.effects.itertuples()],
