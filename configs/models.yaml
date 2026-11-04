@@ -1,0 +1,46 @@
+# Models and checkpoints evaluated in this project.
+# Checkpoints load with revision="stepN".
+#
+# STATUS: proposed, NOT yet verified. AGENTS.md requires checking the available
+# checkpoint list on the Hugging Face model cards before relying on it. Run
+#   python -m evals.list_checkpoints --config configs/models.yaml
+# and set `checkpoints_verified: true` once every step below exists for every model.
+
+checkpoints_verified: false
+
+# Pythia training facts used for step mapping (from the Pythia paper / repo; verify
+# in Phase 0 and record the source in docs/step_mapping.md).
+training:
+  total_steps: 143000
+  batch_size_sequences: 1024
+  sequence_length_tokens: 2049
+
+models:
+  - name: pythia-410m
+    hf_id: EleutherAI/pythia-410m
+    data_version: standard
+  - name: pythia-410m-deduped
+    hf_id: EleutherAI/pythia-410m-deduped
+    data_version: deduped
+  - name: pythia-1.4b
+    hf_id: EleutherAI/pythia-1.4b
+    data_version: standard
+  - name: pythia-1.4b-deduped
+    hf_id: EleutherAI/pythia-1.4b-deduped
+    data_version: deduped
+  - name: pythia-2.8b
+    hf_id: EleutherAI/pythia-2.8b
+    data_version: standard
+  - name: pythia-2.8b-deduped
+    hf_id: EleutherAI/pythia-2.8b-deduped
+    data_version: deduped
+
+# About 30 checkpoints, denser early in training. Identical for every model so
+# abilities are comparable across models at the same step.
+checkpoints:
+  [512, 1000, 2000, 3000, 4000, 6000, 8000, 10000, 13000, 16000,
+   20000, 24000, 28000, 33000, 38000, 43000, 49000, 55000, 61000, 68000,
+   75000, 82000, 90000, 98000, 106000, 114000, 122000, 130000, 137000, 143000]
+
+# Start here if GPU access is delayed (AGENTS.md, Phase 2).
+first_model: pythia-410m
