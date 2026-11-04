@@ -3,342 +3,264 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Seen or Solved? Memorization and generalization in Pythia</title>
-<meta name="description" content="A UofT AI Project X 2026 study of how much of Pythia's benchmark progress over training comes from having read the test questions, and how much from real capability.">
+<title>Seen or Solved? How much of Pythia's progress is memory</title>
+<meta name="description" content="A UofT AI Project X 2026 study measuring how much of the Pythia language models' benchmark progress over training comes from having seen the test questions.">
 <meta property="og:title" content="Seen or Solved?">
-<meta property="og:description" content="How much of Pythia's benchmark progress comes from having read the test questions in training?">
-<meta name="theme-color" content="#38450f">
-<link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+<meta property="og:description" content="How much of Pythia's benchmark progress comes from having seen the test questions in training?">
+<meta name="theme-color" content="#ffffff">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%23a1ffcb' stroke='%23232323' stroke-width='6'/%3E%3C/svg%3E">
 <script>document.documentElement.classList.add('js')</script>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;1,400;1,500&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://api.fontshare.com">
+<link rel="preconnect" href="https://cdn.fontshare.com" crossorigin>
+<link href="https://api.fontshare.com/v2/css?f[]=clash-grotesk@400,500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/css/site.css">
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
 
-<header class="board" id="top">
-  <div class="tile tile--logo">
-    <a href="#top" aria-label="Seen or Solved?, back to top"><img src="assets/img/mark.svg" alt="" width="40" height="40"></a>
+<header class="hero" id="top">
+  <div class="hero__left">
+    <a class="wordmark" href="#top" aria-label="Seen or Solved?, back to top"><span class="wordmark__dot" aria-hidden="true"></span>Seen or Solved?</a>
+    <div class="hero__copy">
+      <h1><span class="line"><span>Seen or solved?</span></span><span class="line"><span>How much is memory?</span></span></h1>
+      <p class="hero__sentence">A study of how much of the Pythia language models’ benchmark progress over training comes from having read the test questions, and how much from getting better.</p>
+      <div class="hero__actions">
+        <a class="button" href="proposal.html">Read the proposal <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M4 12h15M13 6l6 6-6 6"/></svg></a>
+        <a class="link" href="#benchmarks">See the data</a>
+      </div>
+    </div>
   </div>
-  <nav class="tile tile--nav" aria-label="Sections">
-    <ul>
-      <li><a href="#method">Method</a></li>
-      <li><a href="#benchmarks">Benchmarks</a></li>
-      <li><a href="#results">Results</a></li>
-      <li><a href="#plan">Plan</a></li>
-    </ul>
-  </nav>
-  <details class="tile tile--menu">
-    <summary>Menu</summary>
-    <ul>
-      <li><a href="#method">Method</a></li>
-      <li><a href="#benchmarks">Benchmarks</a></li>
-      <li><a href="#results">Results</a></li>
-      <li><a href="#plan">Plan</a></li>
-      <li><a href="https://github.com/Eternal128/ProjectX/blob/main/AGENTS.md">Read the plan</a></li>
-    </ul>
-  </details>
-  <div class="tile tile--action">
-    <a class="button" href="https://github.com/Eternal128/ProjectX/blob/main/AGENTS.md">Read the plan</a>
+  <div class="hero__right">
+    <a class="hero__toplink link" href="https://github.com/Eternal128/ProjectX">Code on GitHub</a>
+    <div class="probe" data-ui>
+      <div class="probe__head">
+        <p class="probe__title">When did Pythia read the question?</p>
+        <p class="ui-label">step <span class="num" id="p-step-head">41,000</span></p>
+      </div>
+      <div class="chart probe__chart" id="probe-chart" role="img" aria-label="Training timeline from step 0 to 143,000 with the 30 evaluated checkpoints, the 10 to 90 percent window, and the step the question was read."></div>
+      <label class="visually-hidden" for="t0">Step the question was read</label>
+      <input class="probe__range" id="t0" type="range" min="0" max="143000" step="500" value="41000" aria-describedby="p-verdict">
+      <dl class="probe__readout" aria-live="polite">
+        <div><dt class="ui-label">Through training</dt><dd id="p-frac">29%</dd></div>
+        <div><dt class="ui-label">Checkpoints before · after</dt><dd id="p-around">15 · 15</dd></div>
+        <div><dt class="ui-label">First read in</dt><dd id="p-batch">batch 40,999</dd></div>
+        <div><dt class="ui-label">In the event study</dt><dd><span class="verdict" id="p-verdict" data-kept="true">Kept</span></dd></div>
+      </dl>
+      <p class="probe__note" id="p-note">Kept: read between 10% and 90% of training, with at least three checkpoints before it.</p>
+    </div>
   </div>
-  <div class="tile tile--name">
-    <h1 class="display load" style="--d:0">Seen or<br> solved?</h1>
-  </div>
-  <figure class="tile tile--pic tile--picA shutter">
-    <img src="assets/img/kylix.svg" alt="Drawing of a kylix, a shallow Greek drinking cup with two handles." width="1000" height="560">
-  </figure>
-  <figure class="tile tile--pic tile--picB">
-    <img src="assets/img/columns.svg" alt="Drawing of the Doric columns of a ruined Greek temple, two of them broken." width="1000" height="560">
-  </figure>
-  <p class="tile tile--dark load" style="--d:2">We test whether Pythia’s benchmark gains come from reading the test questions in training, or from getting better at the task.</p>
-  <p class="tile tile--accent load" style="--d:3">A UofT AI Project&nbsp;X study for&nbsp;2026. Results stay sealed until the analysis is frozen.</p>
 </header>
 
 <main id="main">
 
-  <section class="intro grid" aria-labelledby="intro-h">
-    <div class="intro__text">
-      <h2 id="intro-h" class="intro__h" data-reveal>A score can rise<br> for two reasons.</h2>
-      <p class="intro__p" data-reveal style="--d:1">Pythia may have learned to answer, or it may have read the answer during training. A benchmark counts both as progress and cannot tell them apart.</p>
+  <section class="ledger grid" aria-labelledby="ledger-h">
+    <div class="ledger__intro">
+      <h2 id="ledger-h" class="ledger__h" data-reveal><span>Where Pythia 2.8B</span><span>ends up</span></h2>
+      <p class="ledger__note" data-reveal style="--d:1">Accuracy at the final checkpoint, step 143,000, on the four candidate benchmarks with published results, and on MMLU, which we excluded.</p>
     </div>
-    <figure class="intro__big">
-      <img src="assets/img/laurel.svg" alt="Drawing of a laurel branch with paired leaves and berries." width="720" height="1200" loading="lazy">
-    </figure>
-    <div class="intro__low">
-    <figure class="intro__small" data-reveal style="--d:2">
-      <img src="assets/img/tripod.svg" alt="Drawing of a bronze tripod with a round bowl and two ring handles." width="360" height="400" loading="lazy">
-    </figure>
-    <p class="intro__cap" data-reveal style="--d:3">Laurel, sacred to Apollo at Delphi, and the tripod on which the Pythia sat to give her answers. The models are named after her.</p>
+    <div class="ledger__rows" data-reveal style="--d:2">
+      <div class="ledger__row"><span class="ledger__whole">88</span><span class="ledger__dec">.2</span><p class="ledger__cap"><b>SciQ</b>, % correct. Chance is 25.</p></div>
+      <div class="ledger__row"><span class="ledger__whole">73</span><span class="ledger__dec">.9</span><p class="ledger__cap"><b>PIQA</b>, % correct. Chance is 50.</p></div>
+      <div class="ledger__row"><span class="ledger__whole">64</span><span class="ledger__dec">.7</span><p class="ledger__cap"><b>LAMBADA</b>, % of final words predicted exactly.</p></div>
+      <div class="ledger__row"><span class="ledger__whole">64</span><span class="ledger__dec">.4</span><p class="ledger__cap"><b>ARC-Easy</b>, % correct. Chance is 25.</p></div>
+      <div class="ledger__row ledger__row--out"><span class="ledger__whole">26</span><span class="ledger__dec">.1</span><p class="ledger__cap"><b>MMLU</b>, % correct. Chance is 25, so it is excluded.</p></div>
     </div>
   </section>
 
-  <section class="steps" id="method" aria-labelledby="step-1">
-    <ol class="steps__list">
-      <li class="steps__item" data-reveal>
-        <h2 id="step-1" class="steps__line">First, find it in the&nbsp;Pile.</h2>
-        <p class="steps__text">We search Pythia’s training text for long exact matches of each question with its answer, then look for near-copies by meaning. A question we miss counts as unseen, which pulls every effect toward zero.</p>
-      </li>
-      <li class="steps__item" data-reveal>
-        <h3 class="steps__line">Then, find when it was&nbsp;read.</h3>
-        <p class="steps__text">Pythia saw its data in a fixed, published order, so each match points to the training step where the model first read it, and to how many copies followed.</p>
-      </li>
-      <li class="steps__item" data-reveal>
-        <h3 class="steps__line">Next, score every checkpoint.</h3>
-        <p class="steps__text">For six models at about thirty saved checkpoints each, we record whether every answer was right and the log-probability the model gave it.</p>
-      </li>
-      <li class="steps__item" data-reveal>
-        <h3 class="steps__line">Last, set it beside its&nbsp;twins.</h3>
-        <p class="steps__text">Each seen question is paired with unseen ones of the same difficulty. A jump at the step it was read, and not before, is the effect of having seen it.</p>
-      </li>
-    </ol>
-  </section>
-
-  <section class="timing" id="timing" aria-labelledby="timing-h">
-    <div class="grid timing__top">
-    <h2 id="timing-h" class="timing__h" data-reveal>When Pythia read it</h2>
-    <p class="timing__lead" data-reveal style="--d:1">Pythia trained for 143,000 steps on the Pile, in an order anyone can replay. Find a question in that order and we can name the step it arrived, then watch the checkpoints on either side.</p>
-    </div>
-    <div class="grid timing__row">
-      <figure class="timing__pic" data-reveal style="--d:2">
-        <img src="assets/img/pile.svg" alt="Drawing of a tall stack of loose sheets of paper." width="960" height="600" loading="lazy">
-        <figcaption class="timing__note">A question enters the event study only if we can watch it both ways: at least three checkpoints before it was read, and read between 10% and 90% of the way through training.</figcaption>
-      </figure>
-      <div class="timing__side" data-reveal style="--d:3">
-        <div class="timeline" data-ui>
-          <p class="timeline__title">Thirty checkpoints across training</p>
-          <svg class="timeline__svg" id="timeline-svg" viewBox="0 0 400 150" role="img" aria-labelledby="timeline-desc">
-            <desc id="timeline-desc">Training steps from 0 to 143,000, with the thirty evaluated checkpoints and the step a question was read.</desc>
-          </svg>
-          <div class="js-only">
-            <label for="t0">Step the question was read</label>
-            <input id="t0" type="range" min="0" max="143000" step="500" value="41000" aria-describedby="t0-verdict">
+  <section class="show" id="benchmarks" aria-labelledby="show-h">
+    <div class="show__inner">
+      <h2 id="show-h" class="section-h" data-reveal>Accuracy over training</h2>
+      <p class="section-p" data-reveal style="--d:1">Zero-shot accuracy published by EleutherAI for the six study models at 27 checkpoints. The step axis is logarithmic, so the first 1,000 steps get room.</p>
+      <div class="panel" data-ui data-reveal style="--d:2">
+        <div class="panel__demo">
+          <div class="panel__caption">
+            <h3 id="curve-title">SciQ accuracy, standard Pile</h3>
+            <div class="legend" id="curve-legend"></div>
           </div>
+          <div class="chart" id="curve-chart" role="img" aria-labelledby="curve-title"></div>
+          <p class="panel__source">Source: <a class="link" href="https://github.com/EleutherAI/pythia/tree/a19eecb807ec2c79a39ebf18108816e6ffffc1d5/evals/pythia-v1">EleutherAI/pythia evals</a>, Apache-2.0.</p>
         </div>
-        <dl class="facts" aria-live="polite">
-          <div><dt>Read at step</dt><dd class="num" id="f-step">41,000</dd></div>
-          <div><dt>Through training</dt><dd class="num" id="f-frac">29%</dd></div>
-          <div><dt>Checkpoints before and after</dt><dd class="num" id="f-around">15 and 15</dd></div>
-          <div><dt>In the event study</dt><dd id="t0-verdict">Yes</dd></div>
-        </dl>
+        <form class="panel__controls" id="curve-controls" aria-label="Chart controls">
+          <fieldset class="ctl-group">
+            <legend>Benchmark</legend>
+            <label class="ctl-row"><span>SciQ</span><span><span class="chance">chance 25%</span> <input type="radio" name="bench" value="sciq" checked></span></label>
+            <label class="ctl-row"><span>PIQA</span><span><span class="chance">chance 50%</span> <input type="radio" name="bench" value="piqa"></span></label>
+            <label class="ctl-row"><span>LAMBADA</span><span><span class="chance">chance 0%</span> <input type="radio" name="bench" value="lambada"></span></label>
+            <label class="ctl-row"><span>ARC-Easy</span><span><span class="chance">chance 25%</span> <input type="radio" name="bench" value="arc_easy"></span></label>
+            <label class="ctl-row"><span>MMLU (excluded)</span><span><span class="chance">chance 25%</span> <input type="radio" name="bench" value="mmlu"></span></label>
+          </fieldset>
+          <fieldset class="ctl-group">
+            <legend>Training data</legend>
+            <div class="seg">
+              <label><input type="radio" name="data" value="standard" checked>Standard</label>
+              <label><input type="radio" name="data" value="deduped">Deduplicated</label>
+            </div>
+          </fieldset>
+          <fieldset class="ctl-group">
+            <legend>Show</legend>
+            <label class="ctl-row"><span>Chance level</span><input type="checkbox" name="chance" checked></label>
+            <label class="ctl-row"><span>±2 standard errors</span><input type="checkbox" name="band" checked></label>
+          </fieldset>
+        </form>
+      </div>
+      <p class="show__start">Pick a benchmark and hover the chart for exact values.</p>
+      <details class="table-view"><summary>Show the data as a table</summary><div class="scroll" id="curve-table"></div></details>
+    </div>
+  </section>
+
+  <section class="how" id="method" aria-labelledby="how-h">
+    <h2 id="how-h" class="section-h" data-reveal>How the event study reads it</h2>
+    <p class="section-p" data-reveal style="--d:1">Shown here on simulated questions with a planted jump of 1.5 in log-probability, to check that our code recovers it. These are not results about Pythia.</p>
+    <div class="grid how__body">
+      <div class="how__steps">
+        <div class="how__step is-active" data-state="0">
+          <h3>First, follow seen questions and their unseen twins.</h3>
+          <p>Change in the log-probability of the right answer since the checkpoint before exposure, for questions first read at step t0 and for matched questions never read.</p>
+        </div>
+        <div class="how__step" data-state="1">
+          <h3>Then subtract the twins.</h3>
+          <p>Whatever both groups share, like the model getting better in general, cancels out. What is left is the effect of having read the question.</p>
+        </div>
+        <div class="how__step" data-state="2">
+          <h3>A jump at t0, and not before, is the effect.</h3>
+          <p>95% intervals come from a bootstrap over questions. A rise before t0 would flag the group as not causal; here the estimate recovers the planted 1.5.</p>
+        </div>
+      </div>
+      <div class="how__stage">
+        <div class="stage-card" data-ui>
+          <div class="panel__caption">
+            <h3 id="stage-title">Change since the checkpoint before exposure</h3>
+            <div class="legend" id="stage-legend"></div>
+          </div>
+          <div class="chart" id="stage-chart" role="img" aria-labelledby="stage-title"></div>
+          <p class="panel__source">Simulated: 120 seen and 360 unseen questions on the real 30-checkpoint schedule.</p>
+        </div>
       </div>
     </div>
   </section>
 
-  <section class="chapters" id="benchmarks" aria-labelledby="bench-h">
-    <article class="chapter" data-ink="#ecebe7">
-      <h2 id="bench-h" class="chapter__title">Six sets of questions</h2>
-      <div class="card" data-reveal>
-        <ul class="card__list">
-          <li><span>SQuAD</span><span>2016</span></li>
-          <li><span>LAMBADA</span><span>2016</span></li>
-          <li><span>TriviaQA</span><span>2017</span></li>
-          <li><span>SciQ</span><span>2017</span></li>
-          <li><span>ARC</span><span>2018</span></li>
-          <li><span>PIQA</span><span>2019</span></li>
-        </ul>
-        <p class="card__note">The year each benchmark’s paper first appeared on arXiv. The Pile came out at the end of 2020.</p>
-      </div>
-      <p class="chapter__text">All six were public before the Pile was gathered at the end of 2020. Any that Pythia cannot beat chance on is dropped in the first week.</p>
-      <p class="chapter__links"><a class="link" href="https://github.com/Eternal128/ProjectX/blob/main/configs/benchmarks.yaml">The selection rule</a></p>
-    </article>
-    <article class="chapter">
-      <h3 class="chapter__title">Questions of fact</h3>
-      <div class="card" data-reveal>
-        <p class="card__q">Which chemical element has the symbol Fe?</p>
-        <p class="card__a">Answer: iron</p>
-        <p class="card__q card__q--passage">The Nile flows north through eleven countries before reaching the Mediterranean. Which sea does the Nile flow into?</p>
-        <p class="card__a">Answer: the Mediterranean</p>
-        <p class="card__note">Questions in the formats of TriviaQA and SQuAD, written for this page.</p>
-      </div>
-      <p class="chapter__text">TriviaQA asks trivia questions written by enthusiasts. SQuAD asks about a Wikipedia paragraph, answered by a span of its text.</p>
-      <p class="chapter__links"><a class="link" href="https://arxiv.org/abs/1705.03551">TriviaQA paper</a><a class="link" href="https://arxiv.org/abs/1606.05250">SQuAD paper</a></p>
-    </article>
-    <article class="chapter">
-      <h3 class="chapter__title">The missing word</h3>
-      <div class="card" data-reveal>
-        <p class="card__q card__q--passage">Mara checked the oven twice, laid the table and lit the candles. When the bell finally rang, she wiped her hands, took a breath and went to open the …</p>
-        <p class="card__a">Answer: door</p>
-        <p class="card__note">A passage in LAMBADA’s format, written for this page.</p>
-      </div>
-      <p class="chapter__text">LAMBADA gives a passage from a novel and asks for its last word, which only the whole passage gives away.</p>
-      <p class="chapter__links"><a class="link" href="https://arxiv.org/abs/1606.06031">LAMBADA paper</a></p>
-    </article>
-    <article class="chapter">
-      <h3 class="chapter__title">School science</h3>
-      <div class="card" data-reveal>
-        <p class="card__q">Which form of energy does a green plant use to make its food?</p>
-        <ol class="card__choices">
-          <li><span>A</span>sound</li>
-          <li data-correct><span>B</span>light</li>
-          <li><span>C</span>heat</li>
-          <li><span>D</span>electricity</li>
-        </ol>
-        <p class="card__a">Answer: B</p>
-        <p class="card__q">What is the process by which plants lose water through their leaves?</p>
-        <p class="card__a">Answer: transpiration</p>
-        <p class="card__note">Questions in the formats of ARC and SciQ, written for this page.</p>
-      </div>
-      <p class="chapter__text">ARC-Easy draws on grade-school science exams. SciQ asks crowd-written science exam questions with four choices.</p>
-      <p class="chapter__links"><a class="link" href="https://arxiv.org/abs/1803.05457">ARC paper</a><a class="link" href="https://arxiv.org/abs/1707.06209">SciQ paper</a></p>
-    </article>
-    <article class="chapter">
-      <h3 class="chapter__title">Everyday physics</h3>
-      <div class="card" data-reveal>
-        <p class="card__q">Goal: keep a cut avocado from turning brown.</p>
-        <ol class="card__choices">
-          <li data-correct><span>A</span>Press cling film flat onto the cut face and chill it.</li>
-          <li><span>B</span>Leave it cut side up on a sunny windowsill.</li>
-        </ol>
-        <p class="card__a">Answer: A</p>
-        <p class="card__note">A question in PIQA’s format, written for this page.</p>
-      </div>
-      <p class="chapter__text">PIQA asks which of two ways to do an everyday task would actually work.</p>
-      <p class="chapter__links"><a class="link" href="https://arxiv.org/abs/1911.11641">PIQA paper</a></p>
-    </article>
-  </section>
-
-  <section class="numbers grid" aria-labelledby="numbers-h">
-    <h2 id="numbers-h" class="visually-hidden">In numbers</h2>
-    <p class="numbers__p" data-reveal>We score <strong>6&nbsp;Pythia models</strong> at about <strong>30&nbsp;checkpoints</strong> on <strong>6&nbsp;benchmarks</strong>, and need at least <strong>200&nbsp;seen questions</strong> to go&nbsp;ahead.</p>
-  </section>
-
-  <section class="results" id="results" aria-labelledby="results-h">
-    <div class="results__intro grid">
-      <h2 id="results-h" class="results__h" data-reveal>What we expect to find</h2>
-      <p class="results__lead" data-reveal style="--d:1">Five hypotheses, written down before any result is seen. Each is a finding if it fails. Results appear here once the analysis code and its thresholds are frozen.</p>
-    </div>
-
-    <article class="result grid" data-reveal>
-      <div class="result__visual"><img src="assets/img/hourglass.svg" alt="Drawing of an hourglass with the sand half run through." width="600" height="900"></div>
-      <div class="result__cluster">
-        <figure class="figure-slot" data-ui data-figure="event_study">
-          <svg viewBox="0 0 360 225" role="img" aria-label="Empty figure frame for the event study: change in log-probability against checkpoints since the question was read."><rect width="360" height="225" fill="#e1dfd9"/><rect x="36" y="34" width="2" height="148" fill="#5d683a"/><rect x="36" y="180" width="308" height="2" fill="#5d683a"/><rect x="168" y="34" width="2" height="136" fill="#d5d3cb"/><text x="36" y="22" font-size="15" font-family="EB Garamond, serif" fill="#38450f">Log-probability, seen minus unseen</text><text x="344" y="200" text-anchor="end" font-size="15" font-family="EB Garamond, serif" fill="#38450f">Checkpoints since it was read</text><text x="190" y="112" text-anchor="middle" font-size="17" font-family="EB Garamond, serif" fill="#38450f">Pending</text></svg>
-        </figure>
-        <div class="result__row">
-          <h2 class="result__title">Does seeing it cause a&nbsp;jump?</h2>
+  <section class="proofs" id="checks" aria-labelledby="proofs-h">
+    <div class="proofs__inner">
+      <h2 id="proofs-h" class="section-h" data-reveal>What is already checked</h2>
+      <div class="proofs__list">
+        <article class="proof" data-reveal>
+          <div class="proof__panel" data-ui><div class="chart" id="chance-chart" style="--h:230px" role="img" aria-label="Final-checkpoint accuracy for the six study models on five benchmarks, against chance plus five points."></div></div>
           <div>
-            <p class="result__text">We expect the log-probability of the right answer to rise sharply at the step the question was read, against matched unseen questions, with no rise before it.</p>
-            <p class="status" data-status="event_study" data-state="pending">Pending: analysis not yet frozen</p>
+            <h3>Above chance, or dropped</h3>
+            <p>A benchmark stays only if every model beats chance by five points, significant at p &lt; 0.01, at the final checkpoint.</p>
+            <p>On the published numbers, <b>LAMBADA, PIQA, SciQ and ARC-Easy pass for all six models</b>; MMLU passes for none. TriviaQA and SQuAD are checked with our own evaluation in week one.</p>
           </div>
-        </div>
-      </div>
-    </article>
-
-    <article class="result grid" data-reveal>
-      <div class="result__visual"><img src="assets/img/balance.svg" alt="Drawing of a balance scale tipped toward a pan holding a stack of sheets." width="900" height="900"></div>
-      <div class="result__cluster">
-        <figure class="figure-slot" data-ui data-figure="counterfactual">
-          <svg viewBox="0 0 360 225" role="img" aria-label="Empty figure frame for accuracy over training, observed and with exposure removed."><rect width="360" height="225" fill="#e1dfd9"/><rect x="36" y="34" width="2" height="148" fill="#5d683a"/><rect x="36" y="180" width="308" height="2" fill="#5d683a"/><text x="36" y="22" font-size="15" font-family="EB Garamond, serif" fill="#38450f">Accuracy</text><text x="344" y="200" text-anchor="end" font-size="15" font-family="EB Garamond, serif" fill="#38450f">Training step</text><text x="190" y="112" text-anchor="middle" font-size="17" font-family="EB Garamond, serif" fill="#38450f">Pending</text></svg>
-        </figure>
-        <div class="result__row">
-          <h2 class="result__title">How much of it is&nbsp;memory?</h2>
+        </article>
+        <article class="proof" data-reveal>
+          <div class="proof__panel" data-ui><div class="chart" id="sched-chart" style="--h:150px" role="img" aria-label="The 154 saved checkpoints, the 27 with published results and the 30 this study evaluates, on a logarithmic step axis."></div></div>
           <div>
-            <p class="result__text">We expect the exposure term to be positive and to grow with the number of copies read. Setting it to zero gives the share of progress owed to exposure.</p>
-            <p class="status" data-status="counterfactual" data-state="pending">Pending: analysis not yet frozen</p>
+            <h3>Thirty checkpoints of 154</h3>
+            <p>Pythia saved 154 checkpoints: steps 0, 1, 2, 4 up to 512, then every 1,000. We evaluate 30, denser early.</p>
+            <p>Each step is <b>1,024 sequences of 2,048 tokens</b>, in the same published order for every model size.</p>
           </div>
-        </div>
-      </div>
-    </article>
-
-    <article class="result grid" data-reveal>
-      <div class="result__visual"><img src="assets/img/dividers.svg" alt="Drawing of a pair of measuring dividers, legs open." width="600" height="900"></div>
-      <div class="result__cluster">
-        <figure class="figure-slot" data-ui data-figure="ability">
-          <svg viewBox="0 0 360 225" role="img" aria-label="Empty figure frame for ability and accuracy over training."><rect width="360" height="225" fill="#e1dfd9"/><rect x="36" y="34" width="2" height="148" fill="#5d683a"/><rect x="36" y="180" width="308" height="2" fill="#5d683a"/><text x="36" y="22" font-size="15" font-family="EB Garamond, serif" fill="#38450f">Ability and accuracy</text><text x="344" y="200" text-anchor="end" font-size="15" font-family="EB Garamond, serif" fill="#38450f">Training step</text><text x="190" y="112" text-anchor="middle" font-size="17" font-family="EB Garamond, serif" fill="#38450f">Pending</text></svg>
-        </figure>
-        <div class="result__row">
-          <h2 class="result__title">Ability, or accuracy?</h2>
+        </article>
+        <article class="proof" data-reveal>
+          <div class="proof__panel" data-ui>
+            <table class="tiers">
+              <thead><tr><th>Tier</th><th>Rule</th></tr></thead>
+              <tbody>
+                <tr><td><span class="tier"><i style="background:var(--series-1)"></i>Confirmed</span></td><td>Exact match of 13+ tokens covering question and answer</td></tr>
+                <tr><td><span class="tier"><i style="background:var(--series-2)"></i>Likely</span></td><td>Similarity of 0.85 or more, no exact match</td></tr>
+                <tr><td><span class="tier"><i style="background:var(--axis)"></i>Clean</span></td><td>Nothing above a similarity of 0.50</td></tr>
+              </tbody>
+            </table>
+          </div>
           <div>
-            <p class="result__text">We expect IRT ability and raw accuracy to disagree on when progress speeds up or stalls, and the effect of exposure to change with ability.</p>
-            <p class="status" data-status="ability" data-state="pending">Pending: analysis not yet frozen</p>
+            <h3>Three tiers of exposure</h3>
+            <p>Items in between are left out of both groups. Two people hand-label about 100 items per tier to measure precision.</p>
+            <p>A seen question we miss lands in the clean group, which <b>pulls every effect toward zero</b>.</p>
           </div>
-        </div>
-      </div>
-    </article>
-
-    <article class="result grid" data-reveal>
-      <div class="result__visual"><img src="assets/img/stone.svg" alt="Drawing of an inscribed stone slab carrying the same text in three scripts." width="600" height="840"></div>
-      <div class="result__cluster">
-        <figure class="figure-slot" data-ui data-figure="transfer">
-          <svg viewBox="0 0 360 225" role="img" aria-label="Empty figure frame comparing gains on original and paraphrased questions."><rect width="360" height="225" fill="#e1dfd9"/><rect x="36" y="34" width="2" height="148" fill="#5d683a"/><rect x="36" y="180" width="308" height="2" fill="#5d683a"/><text x="36" y="22" font-size="15" font-family="EB Garamond, serif" fill="#38450f">Gain after exposure</text><text x="120" y="200" text-anchor="middle" font-size="15" font-family="EB Garamond, serif" fill="#38450f">Original</text><text x="270" y="200" text-anchor="middle" font-size="15" font-family="EB Garamond, serif" fill="#38450f">Paraphrased</text><text x="190" y="112" text-anchor="middle" font-size="17" font-family="EB Garamond, serif" fill="#38450f">Pending</text></svg>
-        </figure>
-        <div class="result__row">
-          <h2 class="result__title">Does it survive new&nbsp;wording?</h2>
+        </article>
+        <article class="proof" data-reveal>
+          <div class="proof__panel" data-ui><div class="chart" id="irt-chart" style="--h:240px" role="img" aria-label="True against estimated item difficulty for 200 simulated items."></div></div>
           <div>
-            <p class="result__text">We expect gains on seen questions to carry over only partly to paraphrases with new wording, names and numbers.</p>
-            <p class="status" data-status="transfer" data-state="pending">Pending: analysis not yet frozen</p>
+            <h3>The model recovers what we plant</h3>
+            <p>Exposure IRT fitted to 200 simulated items with a planted exposure effect of δ₀ = 1.0.</p>
+            <p>It recovers <b>δ₀ = <span id="irt-delta">0.985</span></b>, with correlations of <span id="irt-cb">0.91</span> for difficulty and <span id="irt-ca">0.97</span> for ability.</p>
           </div>
-        </div>
+        </article>
+        <article class="proof" data-reveal>
+          <div class="proof__panel" data-ui><div class="chart" id="pre-chart" style="--h:200px" role="img" aria-label="Event-study estimates on simulated data with a planted pre-trend; the pre-period sits below zero."></div></div>
+          <div>
+            <h3>A rise before exposure is caught</h3>
+            <p>The same simulation, but seen questions were already climbing before t0.</p>
+            <p>The pre-trend test flags it: mean pre-period effect <b><span id="pre-val">−0.62</span></b>, interval <span id="pre-ci">−0.68 to −0.56</span>. That group would not be read causally.</p>
+          </div>
+        </article>
       </div>
-    </article>
+    </div>
   </section>
 
-  <section class="plan" id="plan" aria-labelledby="plan-h">
-    <div class="plan__head">
-      <h2 id="plan-h" class="plan__h" data-reveal><span>Twelve weeks,</span> one gate at a time.</h2>
-      <a class="button" href="https://github.com/Eternal128/ProjectX/blob/main/AGENTS.md#work-plan">Read the full plan</a>
-    </div>
-    <div class="plan__body" data-reveal style="--d:1">
-      <div class="tabs" role="tablist" aria-label="Project phases">
-        <button class="tab" role="tab" id="tab-feasibility" aria-controls="p-feasibility" aria-selected="true"><span class="tab__name">Feasibility</span><span class="tab__when">Week 1</span></button>
-        <button class="tab" role="tab" id="tab-exposure" aria-controls="p-exposure" aria-selected="false" tabindex="-1"><span class="tab__name">Exposure</span><span class="tab__when">Weeks 1–4</span></button>
-        <button class="tab" role="tab" id="tab-evaluation" aria-controls="p-evaluation" aria-selected="false" tabindex="-1"><span class="tab__name">Evaluation</span><span class="tab__when">Weeks 1–5</span></button>
-        <button class="tab" role="tab" id="tab-models" aria-controls="p-models" aria-selected="false" tabindex="-1"><span class="tab__name">Models</span><span class="tab__when">Weeks 6–8</span></button>
-        <button class="tab" role="tab" id="tab-robustness" aria-controls="p-robustness" aria-selected="false" tabindex="-1"><span class="tab__name">Robustness</span><span class="tab__when">Weeks 9–10</span></button>
-        <button class="tab" role="tab" id="tab-writeup" aria-controls="p-writeup" aria-selected="false" tabindex="-1"><span class="tab__name">Write-up</span><span class="tab__when">Weeks 11–12</span></button>
+  <section class="rows" id="hypotheses" aria-labelledby="rows-h">
+    <div class="grid rows__grid">
+      <div class="rows__intro">
+        <h2 id="rows-h" class="section-h" data-reveal>Five hypotheses, twelve weeks</h2>
+        <p data-reveal style="--d:1">Written down before any result is seen. Each is a finding if it fails, and results appear here only once the analysis is frozen.</p>
       </div>
-      <div class="panels">
-        <div class="panel" role="tabpanel" id="p-feasibility" aria-labelledby="tab-feasibility">
-          <h3 class="panel__h">Feasibility, week 1</h3>
-          <ul class="bands">
-            <li class="band"><span class="band__when num">Week 1</span><div><p class="band__title">Smoke test</p><p class="band__note">Evaluate one Pythia checkpoint on one benchmark, end to end.</p></div><span class="band__who">Evaluation lead</span></li>
-            <li class="band"><span class="band__when num">Week 1</span><div><p class="band__title">Above chance</p><p class="band__note">Score every candidate benchmark on the final checkpoints and drop any at chance.</p></div><span class="band__who">Evaluation lead</span></li>
-            <li class="band"><span class="band__when num">Week 1</span><div><p class="band__title">Step mapping</p><p class="band__note">Choose how a match in the Pile maps to a training step, and what it costs.</p></div><span class="band__who">Data lead</span></li>
-            <li class="band"><span class="band__when num">Week 1</span><div><p class="band__title">Go or no-go</p><p class="band__note">At least 200 confirmed seen questions must pass the timing filter, or the likely tier joins the main analysis.</p></div><span class="band__who">Whole team</span></li>
+      <div class="rows__col" data-reveal style="--d:2">
+        <div class="rows__group">
+          <h3>Hypotheses</h3>
+          <ul>
+            <li class="row"><span class="row__dot row__dot--pending"></span><span class="row__name">Ability and accuracy disagree<small>on when progress speeds up or stalls</small></span><span class="row__val" data-status="ability">Pending</span></li>
+            <li class="row"><span class="row__dot row__dot--pending"></span><span class="row__name">Reading a question makes it jump<small>against matched unseen questions, with no rise before</small></span><span class="row__val" data-status="event_study">Pending</span></li>
+            <li class="row"><span class="row__dot row__dot--pending"></span><span class="row__name">More copies, bigger effect<small>the exposure term grows with copy count</small></span><span class="row__val" data-status="counterfactual">Pending</span></li>
+            <li class="row"><span class="row__dot row__dot--pending"></span><span class="row__name">The effect depends on ability<small>memory and skill do not simply add up</small></span><span class="row__val">Pending</span></li>
+            <li class="row"><span class="row__dot row__dot--pending"></span><span class="row__name">Gains only partly survive rewording<small>paraphrases with new names and numbers</small></span><span class="row__val" data-status="transfer">Pending</span></li>
           </ul>
         </div>
-        <div class="panel" role="tabpanel" id="p-exposure" aria-labelledby="tab-exposure">
-          <h3 class="panel__h">Exposure, weeks 1 to 4</h3>
-          <ul class="bands">
-            <li class="band"><span class="band__when num">Weeks 1–2</span><div><p class="band__title">Find candidates</p><p class="band__note">Query the Pile with 13-token spans from each question and answer, plus shorter spans.</p></div><span class="band__who">Data lead</span></li>
-            <li class="band"><span class="band__when num">Weeks 2–3</span><div><p class="band__title">Check by meaning</p><p class="band__note">Embed each candidate passage and question, and store their similarity.</p></div><span class="band__who">Data lead</span></li>
-            <li class="band"><span class="band__when num">Week 3</span><div><p class="band__title">Sort into tiers</p><p class="band__note">Confirmed, likely or clean, then the first step each confirmed question was read and its copy count.</p></div><span class="band__who">Data lead</span></li>
-            <li class="band"><span class="band__when num">Week 4</span><div><p class="band__title">Check by hand</p><p class="band__note">Two people label about 100 questions per tier; precision is reported per tier.</p></div><span class="band__who">Validation lead</span></li>
+        <div class="rows__group">
+          <h3>Plan</h3>
+          <ul>
+            <li class="row"><span class="row__dot"></span><span class="row__name">Feasibility and the go or no-go count</span><span class="row__val">Week 1</span></li>
+            <li class="row"><span class="row__dot"></span><span class="row__name">Find questions in the Pile and when they were read</span><span class="row__val">Weeks 1–4</span></li>
+            <li class="row"><span class="row__dot"></span><span class="row__name">Score every checkpoint</span><span class="row__val">Weeks 1–5</span></li>
+            <li class="row"><span class="row__dot"></span><span class="row__name">Exposure IRT and the event study</span><span class="row__val">Weeks 6–8</span></li>
+            <li class="row"><span class="row__dot"></span><span class="row__name">Robustness and paraphrases</span><span class="row__val">Weeks 9–10</span></li>
+            <li class="row"><span class="row__dot"></span><span class="row__name">Write-up and talk</span><span class="row__val">Weeks 11–12</span></li>
           </ul>
         </div>
-        <div class="panel" role="tabpanel" id="p-evaluation" aria-labelledby="tab-evaluation">
-          <h3 class="panel__h">Evaluation, weeks 1 to 5</h3>
-          <ul class="bands">
-            <li class="band"><span class="band__when num">Weeks 1–2</span><div><p class="band__title">Pythia 410M first</p><p class="band__note">Start with the smallest model while GPU time is arranged.</p></div><span class="band__who">Evaluation lead</span></li>
-            <li class="band"><span class="band__when num">Weeks 2–5</span><div><p class="band__title">Every checkpoint</p><p class="band__note">Right or wrong and the answer’s log-probability, for every model, checkpoint and question.</p></div><span class="band__who">Evaluation lead</span></li>
-            <li class="band"><span class="band__when num">Weeks 1–5</span><div><p class="band__title">Within budget</p><p class="band__note">Fixed seeds, pinned versions, and about 50 to 100 GPU hours in all.</p></div><span class="band__who">Evaluation lead</span></li>
-          </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="paper" id="proposal" aria-labelledby="paper-h" style="--n:4">
+    <div class="paper__track">
+      <div class="paper__stage">
+        <div class="paper__left">
+          <h2 id="paper-h" class="paper__h"><span>The</span><span>proposal</span></h2>
+          <ol class="paper__index" id="paper-index">
+            <li class="is-current"><button type="button" data-i="0">Motivation</button><span class="row__val">§1</span></li>
+            <li><button type="button" data-i="1">Method</button><span class="row__val">§5</span></li>
+            <li><button type="button" data-i="2">Validity</button><span class="row__val">§7</span></li>
+            <li><button type="button" data-i="3">Timeline</button><span class="row__val">§9</span></li>
+          </ol>
         </div>
-        <div class="panel" role="tabpanel" id="p-models" aria-labelledby="tab-models">
-          <h3 class="panel__h">Models, weeks 6 to 8</h3>
-          <ul class="bands">
-            <li class="band"><span class="band__when num">Week 6</span><div><p class="band__title">Recovery first</p><p class="band__note">The exposure IRT model must recover known values from simulated data before it sees real data.</p></div><span class="band__who">Statistics lead</span></li>
-            <li class="band"><span class="band__when num">Weeks 6–7</span><div><p class="band__title">Matched twins</p><p class="band__note">Pair each confirmed question with clean ones of the same benchmark and difficulty.</p></div><span class="band__who">Validation lead</span></li>
-            <li class="band"><span class="band__when num">Week 7</span><div><p class="band__title">Event study</p><p class="band__note">Difference-in-differences around the step each question was read, with a test for an earlier rise.</p></div><span class="band__who">Statistics lead</span></li>
-            <li class="band"><span class="band__when num">Week 8</span><div><p class="band__title">Uncertainty</p><p class="band__note">Variational fits on real data, checked by full sampling on a subset of questions.</p></div><span class="band__who">Statistics lead</span></li>
-          </ul>
-        </div>
-        <div class="panel" role="tabpanel" id="p-robustness" aria-labelledby="tab-robustness">
-          <h3 class="panel__h">Robustness, weeks 9 to 10</h3>
-          <ul class="bands">
-            <li class="band"><span class="band__when num">Week 9</span><div><p class="band__title">The likely tier</p><p class="band__note">Add it to each side in turn and see what moves.</p></div><span class="band__who">Statistics lead</span></li>
-            <li class="band"><span class="band__when num">Weeks 9–10</span><div><p class="band__title">Paraphrases</p><p class="band__note">Rewrite a sample of seen questions with new wording, names and numbers, and compare gains.</p></div><span class="band__who">Validation lead</span></li>
-            <li class="band"><span class="band__when num">Week 10</span><div><p class="band__title">Share of progress</p><p class="band__note">Predicted accuracy with every exposure removed, against what was observed.</p></div><span class="band__who">Statistics lead</span></li>
-          </ul>
-        </div>
-        <div class="panel" role="tabpanel" id="p-writeup" aria-labelledby="tab-writeup">
-          <h3 class="panel__h">Write-up, weeks 11 to 12</h3>
-          <ul class="bands">
-            <li class="band"><span class="band__when num">Week 11</span><div><p class="band__title">Stretch goals</p><p class="band__note">Held-out questions on newer models, or crosscoders on two checkpoints. Nothing core depends on them.</p></div><span class="band__who">Whole team</span></li>
-            <li class="band"><span class="band__when num">Week 12</span><div><p class="band__title">Paper and talk</p><p class="band__note">Every figure rebuilt from data with one command, and the limits stated plainly.</p></div><span class="band__who">Whole team</span></li>
-          </ul>
+        <div class="paper__right">
+          <article class="sheet is-current">
+            <p class="sheet__k">Motivation</p>
+            <p class="sheet__text">A curve can rise because a model got better, or because it read the test.</p>
+            <p class="sheet__more">Pythia trained every model on the same public data in the same published order, with 154 checkpoints. That lets us name the step each question was read and watch what happens next. <a class="link" href="proposal.html#1-motivation">Read section 1</a></p>
+          </article>
+          <article class="sheet">
+            <p class="sheet__k">Method</p>
+            <p class="sheet__text">Find each question in the Pile, name the step it was read, measure the jump.</p>
+            <p class="sheet__more">An exposure IRT model estimates how much easier a question gets after exposure, and a model-free difference-in-differences checks it. <a class="link" href="proposal.html#5-method">Read section 5</a></p>
+          </article>
+          <article class="sheet">
+            <p class="sheet__k">Validity</p>
+            <p class="sheet__text">Missed exposure counts seen questions as unseen, pulling effects toward zero.</p>
+            <p class="sheet__more">Hand validation measures each tier’s precision; a pre-trend test guards the matching; results are split by when questions were read. <a class="link" href="proposal.html#7-threats-to-validity">Read section 7</a></p>
+          </article>
+          <article class="sheet">
+            <p class="sheet__k">Timeline</p>
+            <p class="sheet__text">Twelve gated weeks: no phase starts until the last one passes.</p>
+            <p class="sheet__more">The main analysis needs at least 200 confirmed questions that pass the timing filter; otherwise the likely tier joins and the ability term is dropped. <a class="link" href="proposal.html#9-timeline">Read section 9</a></p>
+          </article>
         </div>
       </div>
     </div>
@@ -347,44 +269,32 @@
 </main>
 
 <footer class="foot">
-  <p class="foot__name display" aria-hidden="true">Seen or solved?</p>
-  <div class="grid foot__row">
-    <ul class="foot__places">
-      <li><a class="link" href="https://github.com/Eternal128/ProjectX">Code on GitHub</a></li>
-      <li><a class="link" href="https://github.com/Eternal128/ProjectX/blob/main/AGENTS.md">Read the plan</a></li>
-      <li><a class="link" href="https://github.com/Eternal128/ProjectX/blob/main/docs/prereg_changes.md">Pre-registration log</a></li>
+  <div class="tile tile--statement">
+    <p>A UofT AI Project X study for 2026, research stream “What is progress?”</p>
+    <small>Code under the MIT licence. Pythia evaluation results © EleutherAI, Apache-2.0.</small>
+  </div>
+  <nav class="tile tile--nav" aria-label="Site">
+    <ul>
+      <li><a href="#benchmarks">Benchmarks</a></li>
+      <li><a href="#method">Event study</a></li>
+      <li><a href="#checks">Checks</a></li>
+      <li><a href="#hypotheses">Hypotheses</a></li>
+      <li><a href="proposal.html">Proposal</a></li>
     </ul>
-    <div class="foot__cols">
-      <div>
-        <h2>On this page</h2>
-        <ul>
-          <li><a class="link" href="#method">Method</a></li>
-          <li><a class="link" href="#timing">Timing</a></li>
-          <li><a class="link" href="#benchmarks">Benchmarks</a></li>
-          <li><a class="link" href="#results">Results</a></li>
-        </ul>
-      </div>
-      <div>
-        <h2>Documents</h2>
-        <ul>
-          <li><a class="link" href="https://github.com/Eternal128/ProjectX/blob/main/docs/proposal.md">Proposal</a></li>
-          <li><a class="link" href="https://github.com/Eternal128/ProjectX/blob/main/docs/step_mapping.md">Step mapping</a></li>
-          <li><a class="link" href="https://github.com/Eternal128/ProjectX/tree/main/configs">Configs</a></li>
-        </ul>
-      </div>
-      <div>
-        <h2>Prior work</h2>
-        <ul>
-          <li><a class="link" href="https://aclanthology.org/2024.acl-long.834.pdf">Lesci et al., 2024</a></li>
-          <li><a class="link" href="https://github.com/Eternal128/ProjectX/blob/main/AGENTS.md#references">All references</a></li>
-        </ul>
-      </div>
-    </div>
+  </nav>
+  <div class="tile tile--place">
+    <p>Toronto</p>
+    <p class="soft num" id="toronto-time">Eastern time</p>
   </div>
-  <div class="foot__legal">
-    <p>Project X 2026, UofT AI. Research stream, “What is progress?” Drawings made for this site.</p>
-    <a class="link" href="#top">Back to top</a>
+  <div class="tile tile--code">
+    <p class="soft" style="font-size:14px">Code and configs</p>
+    <a class="link" href="https://github.com/Eternal128/ProjectX">github.com/Eternal128/ProjectX</a>
   </div>
+  <div class="tile tile--mark"><p aria-hidden="true">Seen or Solved?</p></div>
+  <a class="tile tile--cta" href="proposal.html">
+    <p>Read the full proposal</p>
+    <svg viewBox="0 0 56 56" fill="none" stroke="currentColor" stroke-width="4" aria-hidden="true"><path d="M14 42 42 14M20 14h22v22"/></svg>
+  </a>
 </footer>
 
 <script src="assets/js/site.js" defer></script>
