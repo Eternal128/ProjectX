@@ -5,6 +5,7 @@
 const NS = 'http://www.w3.org/2000/svg';
 const COLORS = { '410m': 'var(--series-1)', '1.4b': 'var(--series-2)', '2.8b': 'var(--series-3)' };
 const SIZE_LABEL = { '410m': '410M', '1.4b': '1.4B', '2.8b': '2.8B' };
+const SIZE_NAME = { '410m': 'Small, 410M', '1.4b': 'Medium, 1.4B', '2.8b': 'Large, 2.8B' };
 const BENCH_NAME = { lambada: 'LAMBADA', piqa: 'PIQA', sciq: 'SciQ', arc_easy: 'ARC-Easy', mmlu: 'MMLU' };
 const DESIGN = {
   total: 143000,
@@ -83,11 +84,11 @@ function timing(t0) {
   const { checkpoints, total, filter } = DESIGN;
   const before = checkpoints.filter((s) => s < t0).length;
   const frac = t0 / total;
-  let note = 'Kept: read between 10% and 90% of training, with at least three checkpoints before it.';
+  let note = 'Counted: there are enough saved snapshots before and after this point to see whether reading the question made a difference.';
   let kept = true;
-  if (frac < filter.lo) { kept = false; note = 'Dropped: read in the first 10% of training, too early to see a baseline.'; }
-  else if (frac > filter.hi) { kept = false; note = 'Dropped: read in the last 10% of training, too late to see the effect.'; }
-  else if (before < filter.min_before) { kept = false; note = 'Dropped: fewer than three checkpoints before it.'; }
+  if (frac < filter.lo) { kept = false; note = 'Not counted: read in the first 10% of training, too early to see how the AI did before.'; }
+  else if (frac > filter.hi) { kept = false; note = 'Not counted: read in the last 10% of training, too late to see what changed after.'; }
+  else if (before < filter.min_before) { kept = false; note = 'Not counted: fewer than three snapshots before it to compare with.'; }
   return { before, after: checkpoints.length - before, frac, kept, note };
 }
 
@@ -98,7 +99,7 @@ function drawProbe(t0) {
   const x = linear(0, DESIGN.total, 6, w - 6);
   const r = timing(t0);
   svg.append(el('rect', { x: x(DESIGN.filter.lo * DESIGN.total), y: 30, width: x(DESIGN.filter.hi * DESIGN.total) - x(DESIGN.filter.lo * DESIGN.total), height: 66, rx: 6, fill: '#e9f8ef' }));
-  svg.append(el('text', { x: x(0.5 * DESIGN.total), y: 48, 'text-anchor': 'middle' }, 'timing window, 10% to 90%'));
+  svg.append(el('text', { x: x(0.5 * DESIGN.total), y: 48, 'text-anchor': 'middle' }, 'counted if read in here'));
   svg.append(el('line', { x1: 6, x2: w - 6, y1: 78, y2: 78, stroke: 'var(--grid)', 'stroke-width': 2 }));
   for (const s of DESIGN.checkpoints) {
     const seen = s < t0;
@@ -109,7 +110,7 @@ function drawProbe(t0) {
   svg.append(el('text', { x: 6, y: h - 8 }, '0'));
   svg.append(el('text', { x: x(DESIGN.total / 2), y: h - 8, 'text-anchor': 'middle' }, '71.5k'));
   svg.append(el('text', { x: w - 6, y: h - 8, 'text-anchor': 'end' }, '143k steps'));
-  svg.append(el('text', { x: 6, y: 124, class: 't-ink' }, `● ${r.before} evaluated before`));
+  svg.append(el('text', { x: 6, y: 124, class: 't-ink' }, `● ${r.before} snapshots before`));
   svg.append(el('text', { x: w - 6, y: 124, 'text-anchor': 'end' }, `○ ${r.after} after`));
   return r;
 }
@@ -123,12 +124,12 @@ function setupProbe() {
     document.getElementById('p-step-head').textContent = fmt(t0);
     document.getElementById('p-frac').textContent = pct(r.frac, 0);
     document.getElementById('p-around').textContent = `${r.before} · ${r.after}`;
-    document.getElementById('p-batch').textContent = t0 > 0 ? `batch ${fmt(t0 - 1)}` : 'before training';
+    document.getElementById('p-batch').textContent = `${Math.round((t0 * 2097152) / 1e9)} billion word pieces`;
     const v = document.getElementById('p-verdict');
-    v.textContent = r.kept ? 'Kept' : 'Dropped';
+    v.textContent = r.kept ? 'Yes' : 'No';
     v.dataset.kept = String(r.kept);
     document.getElementById('p-note').textContent = r.note;
-    input.setAttribute('aria-valuetext', `step ${fmt(t0)}, ${r.kept ? 'kept' : 'dropped'}`);
+    input.setAttribute('aria-valuetext', `training step ${fmt(t0)}, ${r.kept ? 'counted' : 'not counted'}`);
   };
   input.addEventListener('input', update);
   new ResizeObserver(() => drawProbe(Number(input.value))).observe(document.getElementById('probe-chart'));
@@ -146,7 +147,7 @@ function drawCurves(B, opts = {}) {
   const box = document.getElementById('curve-chart');
   const st = curveState();
   const { svg, w, h } = frame(box);
-  const m = { l: 44, r: 64, t: 12, b: 34 };
+  const m = { l: 44, r: w < 560 ? 86 : 72, t: 12, b: 34 };
   const models = B.models.filter((mm) => mm.data_version === st.data).map((mm) => mm.name);
   const chance = B.benchmarks.find((b) => b.key === st.bench).chance;
   const all = models.flatMap((mm) => B.series[mm][st.bench].map((p) => p[1]));
@@ -161,9 +162,10 @@ function drawCurves(B, opts = {}) {
     svg.append(el('text', { x: x(s), y: h - 10, 'text-anchor': s === 143000 ? 'end' : 'middle' }, s === 143000 ? '143k' : stepLabel(s)));
   }
   svg.append(el('text', { x: w - m.r, y: h - 10 + 0, 'text-anchor': 'start', dx: 6 }, 'step'));
+  svg.append(el('text', { x: m.l, y: m.t + 4, dx: 4 }, '% correct'));
   if (st.chance) {
     svg.append(el('line', { x1: m.l, x2: w - m.r, y1: y(chance), y2: y(chance), stroke: 'var(--axis)', 'stroke-width': 1.5, 'stroke-dasharray': '4 4' }));
-    svg.append(el('text', { x: w - m.r + 6, y: y(chance) + 4 }, `chance ${Math.round(chance * 100)}%`));
+    svg.append(el('text', { x: w - m.r + 6, y: y(chance) + 4 }, `guessing ${Math.round(chance * 100)}%`));
   }
   const ends = [];
   for (const mm of models) {
@@ -204,18 +206,18 @@ function drawCurves(B, opts = {}) {
     models.forEach((mm, i) => {
       const p = B.series[mm][st.bench][best];
       dots[i].setAttribute('cx', x(s)); dots[i].setAttribute('cy', y(p[1])); dots[i].setAttribute('opacity', 1);
-      rows += `<div class="tt-row"><span class="tt-dot" style="background:${COLORS[sizeOf(mm)]}"></span><span>Pythia ${SIZE_LABEL[sizeOf(mm)]}</span><span>${pct(p[1])} ± ${pct(2 * p[2])}</span></div>`;
+      rows += `<div class="tt-row"><span class="tt-dot" style="background:${COLORS[sizeOf(mm)]}"></span><span>${SIZE_NAME[sizeOf(mm)]}</span><span>${pct(p[1])} ± ${pct(2 * p[2])}</span></div>`;
     });
-    tip.show(`<div class="tt-h">Step ${fmt(s)}</div>${rows}`, (x(s) / w) * rect.width, ((evt.clientY - rect.top)));
+    tip.show(`<div class="tt-h">Training step ${fmt(s)}</div>${rows}`, (x(s) / w) * rect.width, ((evt.clientY - rect.top)));
   };
   hit.addEventListener('pointermove', move);
   hit.addEventListener('pointerleave', () => { tip.hide(); hair.setAttribute('opacity', 0); dots.forEach((d) => d.setAttribute('opacity', 0)); });
 
-  document.getElementById('curve-title').textContent = `${BENCH_NAME[st.bench]} accuracy, ${st.data === 'standard' ? 'standard' : 'deduplicated'} Pile`;
-  document.getElementById('curve-legend').innerHTML = models.map((mm) => `<span><i style="background:${COLORS[sizeOf(mm)]}"></i>Pythia ${SIZE_LABEL[sizeOf(mm)]}</span>`).join('') + (st.chance ? '<span><i class="dash"></i>Chance</span>' : '');
+  document.getElementById('curve-title').textContent = `${BENCH_NAME[st.bench]}: percent correct${st.data === 'standard' ? '' : ', repeats removed'}`;
+  document.getElementById('curve-legend').innerHTML = models.map((mm) => `<span><i style="background:${COLORS[sizeOf(mm)]}"></i>${SIZE_NAME[sizeOf(mm)]}</span>`).join('') + (st.chance ? '<span><i class="dash"></i>Guessing</span>' : '');
   const tv = document.getElementById('curve-table');
   if (!tv.closest('details').open) { tv.innerHTML = ''; return; }
-  const head = ['Step', ...models.map((mm) => `Pythia ${SIZE_LABEL[sizeOf(mm)]}`)];
+  const head = ['Training step', ...models.map((mm) => SIZE_NAME[sizeOf(mm)])];
   const rows = steps.map((s, i) => [fmt(s), ...models.map((mm) => { const p = B.series[mm][st.bench][i]; return `${pct(p[1])} ± ${pct(p[2])}`; })]);
   tv.innerHTML = `<table><thead><tr>${head.map((c) => `<th>${c}</th>`).join('')}</tr></thead><tbody>${rows.map((r) => `<tr>${r.map((c) => `<td>${c}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
 }
@@ -233,7 +235,7 @@ function drawStage(M, state, animate = true) {
   gridY(svg, y, [-0.5, 0, 0.5, 1, 1.5, 2], m.l, w - m.r, (v) => v.toFixed(1));
   for (const k of ks) if (k % 2 === 0 || k === -1) svg.append(el('text', { x: x(k), y: h - 12, 'text-anchor': 'middle' }, k > 0 ? `+${k}` : String(k)));
   svg.append(el('line', { x1: x(-0.5), x2: x(-0.5), y1: m.t, y2: h - m.b, stroke: 'var(--ink)', 'stroke-width': 1, 'stroke-dasharray': '3 4' }));
-  svg.append(el('text', { x: x(-0.5) + 6, y: m.t + 12, class: 't-ink' }, 'read at t0'));
+  svg.append(el('text', { x: x(-0.5) + 6, y: m.t + 12, class: 't-ink' }, 'AI reads it'));
   svg.append(el('line', { x1: m.l, x2: w - m.r, y1: y(0), y2: y(0), stroke: 'var(--axis)', 'stroke-width': 1 }));
   const legend = document.getElementById('stage-legend');
   const g = es.groups;
@@ -241,8 +243,8 @@ function drawStage(M, state, animate = true) {
     drawLine(svg, g.map((r) => [x(r[0]), y(r[1])]), 'var(--series-1)', { animate });
     drawLine(svg, g.map((r) => [x(r[0]), y(r[2])]), 'var(--series-2)', { animate });
     svg.append(el('text', { x: w - m.r, y: y(g[g.length - 1][1]) - 10, 'text-anchor': 'end', class: 't-ink' }, 'seen'));
-    svg.append(el('text', { x: w - m.r, y: y(g[g.length - 1][2]) - 10, 'text-anchor': 'end', class: 't-ink' }, 'unseen twins'));
-    legend.innerHTML = '<span><i style="background:var(--series-1)"></i>Seen</span><span><i style="background:var(--series-2)"></i>Unseen twins</span>';
+    svg.append(el('text', { x: w - m.r, y: y(g[g.length - 1][2]) - 10, 'text-anchor': 'end', class: 't-ink' }, 'never seen'));
+    legend.innerHTML = '<span><i style="background:var(--series-1)"></i>Seen</span><span><i style="background:var(--series-2)"></i>Never-seen look-alikes</span>';
   } else {
     if (state === 1) {
       drawLine(svg, g.map((r) => [x(r[0]), y(r[1])]), 'var(--series-1)', { animate: false, 'stroke-opacity': 0.25 });
@@ -253,14 +255,14 @@ function drawStage(M, state, animate = true) {
       const dn = es.effects.map((e) => [x(e[0]), y(e[2])]).reverse();
       svg.append(el('path', { d: `${pathOf(up)}L${dn.map(([a, b]) => `${a.toFixed(1)} ${b.toFixed(1)}`).join('L')}Z`, fill: 'var(--ink)', 'fill-opacity': 0.12 }));
       svg.append(el('line', { x1: m.l, x2: w - m.r, y1: y(es.planted_jump), y2: y(es.planted_jump), stroke: '#0ca30c', 'stroke-width': 1.5, 'stroke-dasharray': '5 4' }));
-      svg.append(el('text', { x: m.l + 6, y: y(es.planted_jump) - 8 }, `planted ${es.planted_jump}`));
+      svg.append(el('text', { x: w - m.r, y: y(es.planted_jump) - 10, 'text-anchor': 'end' }, `planted jump, ${es.planted_jump}`));
     }
     drawLine(svg, es.effects.map((e) => [x(e[0]), y(e[1])]), 'var(--ink)', { animate });
     for (const e of es.effects) svg.append(el('circle', { cx: x(e[0]), cy: y(e[1]), r: 4, fill: 'var(--ink)', stroke: 'var(--bg)', 'stroke-width': 2 }));
-    legend.innerHTML = state === 2 ? '<span><i style="background:var(--ink)"></i>Seen minus twins, 95% interval</span>' : '<span><i style="background:var(--ink)"></i>Seen minus twins</span>';
+    legend.innerHTML = state === 2 ? '<span><i style="background:var(--ink)"></i>Difference, with likely range</span>' : '<span><i style="background:var(--ink)"></i>Seen minus look-alikes</span>';
   }
-  srTable(box, ['Checkpoints from t0', 'Seen', 'Unseen twins', 'Difference', '95% low', '95% high'],
-    es.effects.map((e, i) => [e[0], g[i][1], g[i][2], e[1], e[2], e[3]]), 'Simulated event study');
+  srTable(box, ['Snapshots from reading', 'Seen', 'Never-seen look-alikes', 'Difference', 'Likely range, low', 'Likely range, high'],
+    es.effects.map((e, i) => [e[0], g[i][1], g[i][2], e[1], e[2], e[3]]), 'Practice data: change in confidence');
 }
 
 function setupStage(M) {
@@ -304,25 +306,25 @@ function drawChance(B) {
       const size = sizeOf(f.model);
       const dedup = f.model.endsWith('deduped');
       const c = el('circle', { cx: x(f.acc), cy: cy + (dedup ? 5 : -5), r: 4.5, fill: dedup ? 'var(--bg)' : COLORS[size], stroke: COLORS[size], 'stroke-width': 2 });
-      c.addEventListener('pointerenter', () => tip.show(`<div class="tt-h">${b.name}, Pythia ${SIZE_LABEL[size]}${dedup ? ' deduped' : ''}</div>${pct(f.acc)} vs chance ${pct(b.chance, 0)}<br>${f.passes ? 'Passes' : 'Fails'} the rule`, Number(c.getAttribute('cx')), cy));
+      c.addEventListener('pointerenter', () => tip.show(`<div class="tt-h">${b.name}, ${SIZE_NAME[size]}${dedup ? ', repeats removed' : ''}</div>${pct(f.acc)} correct; guessing scores ${pct(b.chance, 0)}<br>${f.passes ? 'Clearly better than guessing' : 'Not clearly better than guessing'}`, Number(c.getAttribute('cx')), cy));
       c.addEventListener('pointerleave', () => tip.hide());
       svg.append(c);
     }
   });
-  srTable(box, ['Model', 'Benchmark', 'Accuracy', 'Chance', 'Passes'], B.final.map((f) => [f.model, BENCH_NAME[f.benchmark], pct(f.acc), pct(f.chance, 0), f.passes ? 'yes' : 'no']), 'Final-checkpoint accuracy against chance');
+  srTable(box, ['Model', 'Test', 'Correct', 'Guessing', 'Clearly better'], B.final.map((f) => [f.model, BENCH_NAME[f.benchmark], pct(f.acc), pct(f.chance, 0), f.passes ? 'yes' : 'no']), 'Final scores against random guessing');
 }
 
 function drawSchedule(B) {
   const box = document.getElementById('sched-chart');
   const { svg, w, h } = frame(box);
-  const m = { l: 92, r: 14, t: 10, b: 26 };
+  const m = { l: 128, r: 14, t: 10, b: 26 };
   const x = symlog(DESIGN.total, m.l, w - m.r);
   const saved = [0, 1, 2, 4, 8, 16, 32, 64, 128, 256, 512];
   for (let s = 1000; s <= DESIGN.total; s += 1000) saved.push(s);
   const rows = [
-    ['Saved, 154', saved, 'var(--axis)', 2.2],
-    ['Published, 27', B.steps, 'var(--series-2)', 4],
-    ['Evaluated, 30', DESIGN.checkpoints, 'var(--series-1)', 4],
+    ['All saved, 154', saved, 'var(--axis)', 2.2],
+    ['Scores published, 27', B.steps, 'var(--series-2)', 4],
+    ['We test, 30', DESIGN.checkpoints, 'var(--series-1)', 4],
   ];
   const rowH = (h - m.t - m.b) / rows.length;
   rows.forEach(([label, pts, color, r], i) => {
@@ -331,7 +333,7 @@ function drawSchedule(B) {
     for (const s of pts) svg.append(el('circle', { cx: x(s), cy, r, fill: color, stroke: r > 3 ? 'var(--surface)' : 'none', 'stroke-width': 1.5 }));
   });
   for (const s of [0, 10, 100, 1000, 10000, 143000]) svg.append(el('text', { x: x(s), y: h - 6, 'text-anchor': s === 143000 ? 'end' : 'middle' }, s === 143000 ? '143k' : stepLabel(s)));
-  srTable(box, ['Set', 'Steps'], rows.map(([l, p]) => [l, p.map(fmt).join(', ')]), 'Checkpoint schedule');
+  srTable(box, ['Snapshots', 'Training steps'], rows.map(([l, p]) => [l, p.map(fmt).join(', ')]), 'Saved snapshots');
 }
 
 function drawIrt(M) {
@@ -352,14 +354,14 @@ function drawIrt(M) {
   for (const [t, e] of pts) svg.append(el('circle', { cx: x(t), cy: y(e), r: 4, fill: 'var(--series-1)', 'fill-opacity': 0.75, stroke: 'var(--surface)', 'stroke-width': 1.5 }));
   const lx = m.l + side + 12;
   if (w - lx > 90) {
-    svg.append(el('text', { x: lx, y: m.t + 14, class: 't-ink' }, 'True difficulty →'));
+    svg.append(el('text', { x: lx, y: m.t + 14, class: 't-ink' }, 'Real difficulty →'));
     svg.append(el('text', { x: lx, y: m.t + 32 }, 'across'));
-    svg.append(el('text', { x: lx, y: m.t + 58, class: 't-ink' }, 'Estimated ↑'));
+    svg.append(el('text', { x: lx, y: m.t + 58, class: 't-ink' }, 'Our estimate ↑'));
     svg.append(el('text', { x: lx, y: m.t + 76 }, 'up the side'));
-    svg.append(el('text', { x: lx, y: m.t + 102 }, 'Dashed: perfect'));
-    svg.append(el('text', { x: lx, y: m.t + 120 }, 'recovery'));
+    svg.append(el('text', { x: lx, y: m.t + 102 }, 'Dashed line:'));
+    svg.append(el('text', { x: lx, y: m.t + 120 }, 'a perfect match'));
   }
-  srTable(box, ['True difficulty', 'Estimated'], pts, 'Simulated IRT recovery');
+  srTable(box, ['Real difficulty', 'Our estimate'], pts, 'Practice data: question difficulty');
   document.getElementById('irt-delta').textContent = M.irt.recovered_delta_0.toFixed(3);
   document.getElementById('irt-cb').textContent = M.irt.corr_difficulty.toFixed(2);
   document.getElementById('irt-ca').textContent = M.irt.corr_ability.toFixed(2);
@@ -376,7 +378,7 @@ function drawPretrend(M) {
   const x = linear(ks[0], ks[ks.length - 1], m.l, w - m.r);
   const y = linear(lo, hi, h - m.b, m.t);
   svg.append(el('rect', { x: x(ks[0]) - 4, y: m.t, width: x(-1.5) - x(ks[0]) + 4, height: h - m.t - m.b, fill: '#fde4dc' }));
-  svg.append(el('text', { x: x(ks[0]) + 2, y: m.t + 14, class: 't-ink' }, 'pre-trend'));
+  svg.append(el('text', { x: x(ks[0]) + 2, y: m.t + 14, class: 't-ink' }, 'rising too early'));
   const ticks = []; for (let v = lo; v <= hi + 1e-9; v += 0.5) ticks.push(v);
   gridY(svg, y, ticks, m.l, w - m.r, (v) => v.toFixed(1));
   for (const k of ks) if (k % 2 === 0) svg.append(el('text', { x: x(k), y: h - 8, 'text-anchor': 'middle' }, k > 0 ? `+${k}` : String(k)));
@@ -385,7 +387,7 @@ function drawPretrend(M) {
   svg.append(el('path', { d: `${pathOf(up)}L${dn.map(([a, b]) => `${a.toFixed(1)} ${b.toFixed(1)}`).join('L')}Z`, fill: 'var(--ink)', 'fill-opacity': 0.12 }));
   drawLine(svg, es.effects.map((e) => [x(e[0]), y(e[1])]), 'var(--ink)', { animate: false });
   for (const e of es.effects) svg.append(el('circle', { cx: x(e[0]), cy: y(e[1]), r: 4, fill: e[0] < -1 ? '#d03b3b' : 'var(--ink)', stroke: 'var(--surface)', 'stroke-width': 2 }));
-  srTable(box, ['Checkpoints from t0', 'Effect', '95% low', '95% high'], es.effects.map((e) => [e[0], e[1], e[2], e[3]]), 'Simulated event study with a pre-trend');
+  srTable(box, ['Snapshots from reading', 'Difference', 'Likely range, low', 'Likely range, high'], es.effects.map((e) => [e[0], e[1], e[2], e[3]]), 'Practice data with an early rise');
   document.getElementById('pre-val').textContent = es.pretrend.toFixed(2).replace('-', '−');
   document.getElementById('pre-ci').textContent = `${es.pretrend_ci[0].toFixed(2)} to ${es.pretrend_ci[1].toFixed(2)}`.replaceAll('-', '−');
 }

@@ -48,7 +48,9 @@ def split_title(md_text: str) -> tuple[str, str]:
     title = first.lstrip("# ").strip()
     head, q, sub = title.partition("?")
     if q and sub.strip():
-        return f"<h1>{head}?</h1>\n<p class=\"doc-sub\">{sub.strip()}</p>\n", rest
+        note = ('<p class="doc-note">This is the technical research proposal, written for researchers. '
+                'For a plain-language overview, start on the <a href="index.html">home page</a>.</p>\n')
+        return f"<h1>{head}?</h1>\n<p class=\"doc-sub\">{sub.strip()}</p>\n{note}", rest
     return "", md_text
 
 
