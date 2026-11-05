@@ -8,10 +8,22 @@ is logged with a date and reason in [`prereg_changes.md`](prereg_changes.md).
 
 ## Summary
 
-A language model's benchmark score rises over training for two reasons that the score cannot tell
-apart: the model may have become more capable, or it may have seen the test items during training and
-recalled them. We measure how much of Pythia's benchmark progress over training is explained by
-exposure to benchmark items.
+Benchmark curves are how the field answers "what is progress?" for language models. Pythia 2.8B's
+accuracy on SciQ climbs from 21.9% to 82.9% in its first 13,000 training steps, about 9% of training,
+and adds only 5.3 more points over the remaining 91% (EleutherAI's published results). But a score
+rises for two reasons it cannot tell apart: the model may have become more capable, or it may have
+seen the test items during training and recalled them. **Because Pythia's training data and its order
+are public, we can date the moment each benchmark question was first read and measure how much of the
+progress curve that reading explains.**
+
+Contributions:
+
+- **Exposure dating.** Find benchmark items in the Pile and date their first exposure to the training
+  step, with hand-validated precision per tier (sections 5.1 to 5.3).
+- **A causal effect of exposure.** An event study around each item's first exposure, with a pre-trend
+  test (section 5.6).
+- **The share of progress that is exposure.** An exposure-aware IRT model and its counterfactual,
+  tested for dose and ability effects and transfer to paraphrases (sections 5.5, 5.7, 5.8).
 
 Pythia is unusually well suited to this. Every model in the suite was trained on the same public
 corpus (the Pile) in the same fixed, published order, with 154 checkpoints saved along the way. That

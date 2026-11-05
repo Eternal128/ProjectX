@@ -159,6 +159,25 @@ One script per figure in `src/figures/`, reading only from `data/`. Every figure
 - Commit messages say what changed and why. Open a pull request for any change to `src/irt/` or `src/event_study/`, reviewed by the statistics lead.
 - Keep compute in check. The core project should need about 50 to 100 GPU hours, mostly checkpoint evaluation. Flag anything that looks like it will exceed that.
 
+## Writing the paper
+
+Every write-up (paper, proposal, talk, the website's research sections) follows `docs/writing_guide.md`,
+distilled from four ProjectX winning papers and set to exceed them. The paper's skeleton is
+`docs/paper_outline.md`. The short form:
+
+- Open with the stakes and the theme ("What is progress?") and a real number in the first paragraph.
+- State the gap in one sentence, the idea in one bolded sentence, then 3 contribution bullets, each
+  pointing to the section and table or figure that supports it.
+- Every estimate carries a 95% interval and its sample size; key results are repeated with a second
+  seed or split. Causal language only where the event study's pre-trend test passes.
+- The main claim is compared against a naive baseline and standard IRT, in a table.
+- Report failed hypotheses, pre-registration deviations, tier precision and the bias toward zero from
+  missed exposure, as findings, not footnotes.
+- No overclaiming words (pioneering, novel, revolutionary, groundbreaking, state-of-the-art) unless a
+  table shows it. Every claim points to its evidence.
+- NeurIPS-style layout, about 9 pages plus references and an appendix of settings; every figure rebuilt
+  from `data/` by one command.
+
 ## Team roles
 
 | Role | Owns |
