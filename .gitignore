@@ -1,0 +1,43 @@
+# Bulk data stays out of git. Keep directory placeholders and small manifests.
+data/**
+!data/*/
+!data/**/.gitkeep
+!data/**/*.manifest.json
+!data/**/MANIFEST.md
+
+# Generated outputs
+outputs/
+*.parquet
+*.npz
+*.pt
+*.safetensors
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# Caches
+.cache/
+hf_cache/
+lm_eval_cache/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+
+# design skill working files
+.taste-skill/
+
+# Vercel
+.vercel/

@@ -1,0 +1,49 @@
+# Candidate benchmarks. Each must predate the Pile (end of 2020) and Pythia must
+# score clearly above chance on the final checkpoint. Week 1 task: run the
+# above-chance check and set `status` to keep or drop. Never drop a benchmark
+# for any other reason after that check.
+#
+# Excluded on purpose: GSM8K (2021, cannot be in the Pile) and MMLU (near chance
+# at this scale).
+#
+# lm_eval_task names are for lm-evaluation-harness 0.4.x; confirm with
+#   lm_eval --tasks list
+# `output_type` decides how logp of the correct answer is extracted (src/evals).
+
+above_chance:
+  # Benchmark is kept if final-checkpoint accuracy on pythia-410m exceeds chance
+  # by at least this many points AND the binomial test against chance has p < alpha.
+  min_margin: 0.05
+  alpha: 0.01
+
+benchmarks:
+  - name: triviaqa
+    lm_eval_task: triviaqa
+    output_type: generate_until   # needs a custom gold-answer loglikelihood task for logp
+    chance: 0.0
+    status: candidate
+  - name: squad
+    lm_eval_task: squadv2         # verify: SQuAD v1.1 vs v2 task availability
+    output_type: generate_until
+    chance: 0.0
+    status: candidate
+  - name: lambada
+    lm_eval_task: lambada_openai
+    output_type: loglikelihood
+    chance: 0.0
+    status: candidate
+  - name: arc_easy
+    lm_eval_task: arc_easy
+    output_type: multiple_choice
+    chance: 0.25
+    status: candidate
+  - name: sciq
+    lm_eval_task: sciq
+    output_type: multiple_choice
+    chance: 0.25
+    status: candidate
+  - name: piqa
+    lm_eval_task: piqa
+    output_type: multiple_choice
+    chance: 0.5
+    status: candidate

@@ -1,0 +1,15 @@
+# Checkpoint evaluation (src/evals). Library versions are pinned in pyproject.toml
+# under the `eval` extra and recorded in every output's provenance.
+
+seed: 1234
+models_config: configs/models.yaml
+benchmarks_config: configs/benchmarks.yaml
+batch_size: auto
+dtype: float16
+num_fewshot: 0
+limit: null                 # set an int for the development split
+output_dir: data/evals
+# Development split: analysis code is written against this subset first.
+dev_split:
+  fraction: 0.1
+  seed: 7
