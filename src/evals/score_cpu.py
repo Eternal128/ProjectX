@@ -100,12 +100,14 @@ def main(argv=None) -> None:
         items = kept
     name = args.model.split("/")[-1]
     out_dir = REPO_ROOT / "data" / "evals" / "pilot" / name
+    if args.limit:  # smoke tests go aside so they never block or mix with the full run
+        out_dir = out_dir / "smoke"
     cache = REPO_ROOT / "data" / "hf_cache"
     tok = AutoTokenizer.from_pretrained(args.model, revision=f"step{args.steps[-1]}", cache_dir=cache)
     prov = provenance({"model": args.model, "steps": args.steps, "limit": args.limit, "n_items": len(items)})
     for step in args.steps:
         out = out_dir / f"step{step}.parquet"
-        if out.exists() and not args.limit:
+        if out.exists():
             print(f"step{step}: already scored")
             continue
         t0 = time.time()

@@ -222,6 +222,106 @@ function drawCurves(B, opts = {}) {
   tv.innerHTML = `<table><thead><tr>${head.map((c) => `<th>${c}</th>`).join('')}</tr></thead><tbody>${rows.map((r) => `<tr>${r.map((c) => `<td>${c}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
 }
 
+// ---------- pilot: questions found in the Pile vs not found (real data) ----------
+const GROUP = {
+  confirmed: { name: 'Question and answer found', color: 'var(--series-1)' },
+  question_only: { name: 'Question found, answer not near it', color: 'var(--series-2)' },
+  clean: { name: 'Not found', color: 'var(--axis)' },
+};
+const PILOT_MIN_N = 10;
+
+function pilotState() {
+  const d = new FormData(document.getElementById('pilot-controls'));
+  return { bench: d.get('pbench'), measure: d.get('pmeasure') };
+}
+
+function drawPilot(P, opts = {}) {
+  const box = document.getElementById('pilot-chart');
+  if (!box || !P.groups) return;
+  const st = pilotState();
+  const { svg, w, h } = frame(box);
+  const m = { l: 52, r: w < 560 ? 96 : 120, t: 12, b: 34 };
+  const groups = P.groups[st.bench] || {};
+  const keys = Object.keys(GROUP).filter((k) => groups[k] && groups[k].n >= PILOT_MIN_N);
+  const acc = st.measure === 'acc';
+  const col = acc ? [1, 2, 3] : [4, 5, 6];
+  const vals = keys.flatMap((k) => groups[k].series.flatMap((r) => [r[col[1]], r[col[2]]])).filter((v) => Number.isFinite(v));
+  if (!vals.length) return;
+  let lo = Math.min(...vals), hi = Math.max(...vals);
+  const pad = (hi - lo) * 0.08 || 0.05;
+  lo -= pad; hi += pad;
+  if (acc) { lo = Math.max(0, Math.floor(lo * 10) / 10); hi = Math.min(1, Math.ceil(hi * 10) / 10); }
+  const x = symlog(DESIGN.total, m.l, w - m.r);
+  const y = linear(lo, hi, h - m.b, m.t);
+  const ticks = [];
+  const stepT = acc ? (hi - lo > 0.5 ? 0.2 : 0.1) : Math.max(0.5, Math.round((hi - lo) / 5 * 2) / 2);
+  for (let v = Math.ceil(lo / stepT) * stepT; v <= hi + 1e-9; v += stepT) ticks.push(+v.toFixed(2));
+  gridY(svg, y, ticks, m.l, w - m.r, (v) => (acc ? `${Math.round(v * 100)}%` : v.toFixed(1)));
+  for (const s of P.steps) if ([512, 3000, 13000, 53000, 143000].includes(s)) {
+    svg.append(el('text', { x: x(s), y: h - 10, 'text-anchor': s === 143000 ? 'end' : 'middle' }, stepLabel(s)));
+  }
+  svg.append(el('text', { x: m.l, y: m.t + 4, dx: 4 }, acc ? '% correct' : 'confidence in right answer'));
+  const ends = [];
+  for (const k of keys) {
+    const rows = groups[k].series;
+    const up = rows.map((r) => [x(r[0]), y(r[col[2]])]);
+    const dn = rows.map((r) => [x(r[0]), y(r[col[1]])]).reverse();
+    svg.append(el('path', { d: `${pathOf(up)}L${dn.map(([a, b]) => `${a.toFixed(1)} ${b.toFixed(1)}`).join('L')}Z`, fill: GROUP[k].color, 'fill-opacity': 0.14 }));
+    drawLine(svg, rows.map((r) => [x(r[0]), y(r[col[0]])]), GROUP[k].color, { animate: opts.animate });
+    for (const r of rows) svg.append(el('circle', { cx: x(r[0]), cy: y(r[col[0]]), r: 3, fill: GROUP[k].color }));
+    const last = rows[rows.length - 1];
+    ends.push({ k, y: y(last[col[0]]), v: last[col[0]] });
+  }
+  ends.sort((a, b) => a.y - b.y);
+  for (let i = 1; i < ends.length; i++) if (ends[i].y - ends[i - 1].y < 15) ends[i].y = ends[i - 1].y + 15;
+  for (const e of ends) svg.append(el('text', { x: w - m.r + 8, y: e.y + 4, class: 't-ink' }, `${acc ? pct(e.v, 0) : e.v.toFixed(2)} · n=${fmt(groups[e.k].n)}`));
+  // hover
+  const hair = el('line', { y1: m.t, y2: h - m.b, stroke: 'var(--ink)', 'stroke-width': 1, opacity: 0 });
+  svg.append(hair);
+  const hit = el('rect', { x: m.l, y: m.t, width: w - m.l - m.r, height: h - m.t - m.b, fill: 'transparent', style: 'cursor:crosshair' });
+  svg.append(hit);
+  const tip = tooltip(box);
+  hit.addEventListener('pointermove', (evt) => {
+    const rect = svg.getBoundingClientRect();
+    const px = ((evt.clientX - rect.left) / rect.width) * w;
+    let best = 0;
+    P.steps.forEach((s, i) => { if (Math.abs(x(s) - px) < Math.abs(x(P.steps[best]) - px)) best = i; });
+    const s = P.steps[best];
+    hair.setAttribute('x1', x(s)); hair.setAttribute('x2', x(s)); hair.setAttribute('opacity', 0.35);
+    const rowsH = keys.map((k) => { const r = groups[k].series[best]; const f = (v) => (acc ? pct(v) : v.toFixed(2)); return `<div class="tt-row"><span class="tt-dot" style="background:${GROUP[k].color}"></span><span>${GROUP[k].name}</span><span>${f(r[col[0]])} (${f(r[col[1]])} to ${f(r[col[2]])})</span></div>`; }).join('');
+    tip.show(`<div class="tt-h">Training step ${fmt(s)}</div>${rowsH}`, (x(s) / w) * rect.width, evt.clientY - rect.top);
+  });
+  hit.addEventListener('pointerleave', () => { tip.hide(); hair.setAttribute('opacity', 0); });
+  const bname = st.bench === 'all' ? 'All three tests' : BENCH_NAME[st.bench];
+  document.getElementById('pilot-title').textContent = `${bname}: ${acc ? 'percent correct' : 'confidence in the right answer'}, Pythia 410M`;
+  document.getElementById('pilot-legend').innerHTML = keys.map((k) => `<span><i style="background:${GROUP[k].color}"></i>${GROUP[k].name}</span>`).join('');
+  srTable(box, ['Training step', ...keys.map((k) => GROUP[k].name)], P.steps.map((s, i) => [fmt(s), ...keys.map((k) => { const r = groups[k].series[i]; return acc ? pct(r[1]) : r[4].toFixed(2); })]), document.getElementById('pilot-title').textContent);
+}
+
+function fillPilot(P) {
+  const counts = document.getElementById('pilot-counts');
+  if (counts && P.tier_counts) {
+    const benches = Object.keys(P.tier_counts);
+    const tot = (k) => benches.reduce((a, b) => a + (P.tier_counts[b][k] || 0), 0);
+    const all = benches.reduce((a, b) => a + Object.values(P.tier_counts[b]).reduce((u, v) => u + v, 0), 0);
+    counts.innerHTML = `<table><thead><tr><th>Test</th><th>Question and answer found</th><th>Question found only</th><th>Not found</th><th>Too short to tell</th></tr></thead><tbody>${
+      benches.map((b) => { const c = P.tier_counts[b]; return `<tr><td>${BENCH_NAME[b]}</td><td>${fmt(c.confirmed || 0)}</td><td>${fmt(c.question_only || 0)}</td><td>${fmt(c.clean || 0)}</td><td>${fmt(c.ambiguous || 0)}</td></tr>`; }).join('')
+    }<tr><td><b>All ${fmt(all)}</b></td><td><b>${fmt(tot('confirmed'))}</b></td><td><b>${fmt(tot('question_only'))}</b></td><td><b>${fmt(tot('clean'))}</b></td><td><b>${fmt(tot('ambiguous'))}</b></td></tr></tbody></table>`;
+  }
+  const chk = document.getElementById('pilot-check');
+  if (chk && P.accuracy) {
+    const benches = Object.keys(P.accuracy);
+    chk.innerHTML = `<table><thead><tr><th>Training step</th>${benches.map((b) => `<th>${BENCH_NAME[b]}: ours · EleutherAI</th>`).join('')}</tr></thead><tbody>${
+      P.steps.map((s, i) => `<tr><td>${fmt(s)}</td>${benches.map((b) => { const r = P.accuracy[b][i]; return `<td>${pct(r[1])} · ${r[2] == null ? 'n/a' : pct(r[2])}</td>`; }).join('')}</tr>`).join('')
+    }</tbody></table>`;
+  }
+  const ex = document.getElementById('pilot-examples');
+  if (ex && P.examples && P.examples.length) {
+    ex.innerHTML = P.examples.map((e) => `<li><p class="pilot__q">“${e.question.replace(/</g, '&lt;')}”</p><p class="pilot__a">Answer: ${e.answer.replace(/</g, '&lt;')} · ${BENCH_NAME[e.benchmark]} · found ${fmt(e.copies)} ${e.copies === 1 ? 'time' : 'times'}</p></li>`).join('');
+    ex.closest('.pilot__examples').hidden = false;
+  }
+}
+
 // ---------- event study stage (simulated) ----------
 function drawStage(M, state, animate = true) {
   const box = document.getElementById('stage-chart');
@@ -446,7 +546,14 @@ async function getJSON(path) {
 (async () => {
   setupProbe();
   setupPaper();
-  const [B, M, R] = await Promise.all([getJSON('data/benchmarks.json'), getJSON('data/methods.json'), getJSON('data/results.json')]);
+  const [B, M, R, P] = await Promise.all([getJSON('data/benchmarks.json'), getJSON('data/methods.json'), getJSON('data/results.json'), getJSON('data/pilot.json')]);
+  if (P && P.groups && Object.keys(P.groups).length) {
+    document.getElementById('pilot').hidden = false;
+    fillPilot(P);
+    drawPilot(P, { animate: false });
+    document.getElementById('pilot-controls').addEventListener('change', () => drawPilot(P));
+    new ResizeObserver(() => drawPilot(P, { animate: false })).observe(document.getElementById('pilot-chart'));
+  }
   if (B) {
     drawCurves(B, { animate: false });
     document.getElementById('curve-controls').addEventListener('change', () => drawCurves(B));
