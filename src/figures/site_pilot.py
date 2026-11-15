@@ -50,7 +50,9 @@ def main(argv=None) -> None:
         raise SystemExit("no pilot scores yet: run python -m evals.score_cpu first")
     lam_files = sorted((REPO_ROOT / "data" / "evals" / "pilot" / args.model / "lambada").glob("step*.parquet"))
     df = pd.concat([pd.read_parquet(f) for f in files + lam_files])
-    steps = sorted(df["step"].unique().tolist())
+    # checkpoints every benchmark has been scored at (runs can be partway through)
+    steps = sorted(set.intersection(*(set(g["step"].unique().tolist()) for _, g in df.groupby("benchmark"))))
+    df = df[df["step"].isin(steps)]
 
     published = json.loads((REPO_ROOT / "site" / "data" / "benchmarks.json").read_text())
     pub = {b: {p[0]: p[1] for p in pts} for b, pts in published["series"][f"pythia-{args.model.split('-')[-1]}"].items()} \
