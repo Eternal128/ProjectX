@@ -40,6 +40,7 @@ def score_items(model, tok, items, batch_tokens: int = 6000) -> list[dict]:
             ids = (ctx + cont)[-2048:]
             seqs.append((i, j, ids, len(cont)))
     order = sorted(range(len(seqs)), key=lambda k: len(seqs[k][2]))
+    body, head = model.base_model, model.get_output_embeddings()
     ll = np.zeros(len(seqs))
     greedy = np.zeros(len(seqs), dtype=bool)
     k = 0
@@ -55,15 +56,17 @@ def score_items(model, tok, items, batch_tokens: int = 6000) -> list[dict]:
             for r, t in enumerate(idx):
                 ids = seqs[t][2]
                 batch[r, :len(ids)] = torch.tensor(ids)
-            logits = model(batch).logits.float()
-            logprobs = torch.log_softmax(logits, dim=-1)
+            # run the transformer, then the output layer only at the answer positions: the same
+            # numbers as model(batch).logits there, without a (batch x length x 50k) tensor
+            hidden = body(input_ids=batch).last_hidden_state
             for r, t in enumerate(idx):
                 ids, ncont = seqs[t][2], seqs[t][3]
                 n = len(ids)
                 pos = torch.arange(n - ncont - 1, n - 1)
                 tgt = torch.tensor(ids[n - ncont:])
-                ll[t] = logprobs[r, pos, tgt].sum().item()
-                greedy[t] = bool((logits[r, pos].argmax(-1) == tgt).all())
+                logits = head(hidden[r, pos]).float()
+                ll[t] = torch.log_softmax(logits, dim=-1)[torch.arange(ncont), tgt].sum().item()
+                greedy[t] = bool((logits.argmax(-1) == tgt).all())
             k += bs
     by_item: dict[int, list[float]] = {}
     greedy_of: dict[tuple[int, int], bool] = {}
