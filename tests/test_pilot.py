@@ -67,3 +67,11 @@ def test_coverage_summary_counts_an_item_once_across_windows():
     s = summarise(df).set_index(["benchmark", "check"])
     assert s.loc[("sciq", "13-word window found"), "found"] == 1 and s.loc[("sciq", "13-word window found"), "items"] == 2
     assert s.loc[("triviaqa", "question and answer found"), "share"] == 0.5
+
+
+def test_lambada_item_predicts_the_last_word_greedily():
+    from evals.benchmarks import items_lambada
+
+    it = items_lambada([{"text": "She opened the door and saw her brother"}])[0]
+    assert it["prompt"] == "She opened the door and saw her" and it["choices"] == [" brother"]
+    assert it["greedy"] is True and it["answer"] == 0 and it["item_id"] == "lambada-0"
