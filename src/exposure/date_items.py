@@ -28,7 +28,7 @@ import pandas as pd
 from common.config import REPO_ROOT, load_config, provenance, write_parquet
 from evals.benchmarks import load_items
 from exposure.pile_order import (BATCH, DOC_WINDOW, TRAINED_SAMPLES, TokenizedPile, TrainingOrder,
-                                 find_subsequence, read_training_sample)
+                                 find_neox_docs, find_subsequence, read_training_sample)
 from exposure.retrieval import InfiniGramClient
 from exposure.search_items import clean_text
 from exposure.step_mapping import copy_count_at, first_exposure_step
@@ -78,6 +78,7 @@ def main(argv=None) -> None:
     ap.add_argument("--source", choices=["pilot", "lambada"], default="pilot",
                     help="pilot: found SciQ / ARC-Easy / PIQA questions; lambada: LAMBADA passages found by the coverage probe")
     ap.add_argument("--max-copies", type=int, default=50)
+    ap.add_argument("--workers", type=int, default=4)
     args = ap.parse_args(argv)
     from transformers import AutoTokenizer
 
@@ -88,8 +89,10 @@ def main(argv=None) -> None:
     pile, order = TokenizedPile(), TrainingOrder()
     todo = targets(args.source)
 
-    rows = []
-    for t in todo:
+    _ = order._doc_positions  # build the reverse lookup once, before the worker threads
+
+    def date_one(t: dict) -> list[dict]:
+        out = []
         q, needle = t["query"], needle_of(tok, t["query"])
         hit = client.request("find", query=q)
         ranks = [(s, k) for s, (lo, hi) in enumerate(hit.get("segment_by_shard", [])) for k in range(lo, hi)][: args.max_copies]
@@ -99,21 +102,25 @@ def main(argv=None) -> None:
             base = {"benchmark": t["benchmark"], "item_id": t["item_id"], "tier": t["tier"], "ig_doc": int(d["doc_ix"]),
                     "source": f'{meta.get("path")}:{meta.get("linenum")}',
                     "pile_set": meta.get("metadata", {}).get("meta", {}).get("pile_set_name")}
-            toks, starts = pile.window(base["ig_doc"] - DOC_WINDOW, base["ig_doc"] + DOC_WINDOW)
-            docs = sorted({base["ig_doc"] - DOC_WINDOW + int(np.searchsorted(starts, h, side="right")) - 1
-                           for h in find_subsequence(toks, needle)})
+            docs = find_neox_docs(pile, base["ig_doc"], needle)
             if not docs:
-                rows.append({**base, "neox_doc": -1, "sample": -1, "position": -1, "step": -1, "verified": False})
+                out.append({**base, "neox_doc": -1, "sample": -1, "position": -1, "step": -1, "verified": False})
                 continue
             for doc in docs:
                 for sample in order.samples_of_doc(doc):
                     pos = order.training_position(sample)
                     trained = pos < TRAINED_SAMPLES
                     ok = trained and bool(find_subsequence(read_training_sample(pos), needle))
-                    rows.append({**base, "neox_doc": doc, "sample": sample, "position": pos,
-                                 "step": pos // BATCH + 1 if trained else -1, "verified": ok})
-        n_ok = len({x["position"] for x in rows if x["benchmark"] == t["benchmark"] and x["item_id"] == t["item_id"] and x["verified"]})
+                    out.append({**base, "neox_doc": doc, "sample": sample, "position": pos,
+                                "step": pos // BATCH + 1 if trained else -1, "verified": ok})
+        n_ok = len({x["position"] for x in out if x["verified"]})
         print(f"{t['benchmark']} {t['item_id']}: {len(ranks)} copies, {n_ok} verified training samples", flush=True)
+        return out
+
+    from concurrent.futures import ThreadPoolExecutor
+
+    with ThreadPoolExecutor(max_workers=args.workers) as pool:  # network-bound: overlap the waits
+        rows = [r for out in pool.map(date_one, todo) for r in out]
 
     # two infini-gram copies in one document lead to the same training samples: count each sample once
     dates = pd.DataFrame(rows).drop_duplicates(["benchmark", "item_id", "neox_doc", "sample"]).reset_index(drop=True)

@@ -42,6 +42,22 @@ SAMPLE_BYTES = SEQ_TOKENS * 2  # uint16 tokens
 BATCH = 1024
 TRAINED_SAMPLES = 143_000 * BATCH
 DOC_WINDOW = 3000  # infini-gram vs GPT-NeoX document numbering drift (empty documents)
+# measured drift: 1,339 at doc 99,410,851 and 2,572 at doc 195,793,549, about 1.32e-5 per
+# document; search a narrow window around the predicted drift first, the full window after
+DRIFT_PER_DOC = 1.32e-5
+NARROW_WINDOW = 300
+
+
+def find_neox_docs(pile: "TokenizedPile", ig_doc: int, needle: np.ndarray) -> list[int]:
+    """Pythia's document numbers that hold `needle`, near infini-gram's document `ig_doc`."""
+    guess = ig_doc - int(round(ig_doc * DRIFT_PER_DOC))
+    for lo, hi in ((guess - NARROW_WINDOW, guess + NARROW_WINDOW), (ig_doc - DOC_WINDOW, ig_doc + DOC_WINDOW)):
+        lo = max(0, lo)
+        toks, starts = pile.window(lo, hi)
+        docs = sorted({lo + int(np.searchsorted(starts, h, side="right")) - 1 for h in find_subsequence(toks, needle)})
+        if docs:
+            return docs
+    return []
 MAPS = "pile_20B_tokenizer_text_document_train_0_indexmap_147164160ns_2048sl_1234s"
 
 
@@ -121,8 +137,25 @@ class TrainingOrder:
         self.inverse[shuffle] = np.arange(len(shuffle), dtype=np.int64)
         self._sample_doc = np.asarray(self.sample_idx[:, 0])
 
+    @property
+    def _doc_positions(self):
+        """Where each document sits in doc_idx, built once. Pythia's standard run is a single
+        epoch, so doc_idx is a permutation; with several epochs fall back to a scan."""
+        if not hasattr(self, "_pos_cache"):
+            d = np.asarray(self.doc_idx)
+            if len(d) == d.max() + 1:
+                inv = np.empty(len(d), dtype=np.int64)
+                inv[d] = np.arange(len(d), dtype=np.int64)
+                self._pos_cache = inv
+            else:
+                self._pos_cache = None
+        return self._pos_cache
+
     @lru_cache(maxsize=None)
     def doc_position(self, doc: int) -> np.ndarray:
+        inv = self._doc_positions
+        if inv is not None:
+            return np.array([inv[doc]])
         return np.flatnonzero(np.asarray(self.doc_idx) == doc)
 
     def samples_of_doc(self, doc: int) -> list[int]:
