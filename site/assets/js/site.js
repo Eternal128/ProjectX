@@ -255,15 +255,16 @@ function drawPilot(P, opts = {}) {
   const pad = (hi - lo) * 0.08 || 0.05;
   lo -= pad; hi += pad;
   if (acc) { lo = Math.max(0, Math.floor(lo * 10) / 10); hi = Math.min(1, Math.ceil(hi * 10) / 10); }
-  const l0 = Math.log10(P.steps[0]), l1 = Math.log10(DESIGN.total);
+  const steps = groups[keys[0]].series.map((r) => r[0]);
+  const l0 = Math.log10(steps[0]), l1 = Math.log10(DESIGN.total);
   const x = (v) => m.l + ((Math.log10(v) - l0) / (l1 - l0)) * (w - m.l - m.r);
   const y = linear(lo, hi, h - m.b, m.t);
   const ticks = [];
   const stepT = acc ? (hi - lo > 0.5 ? 0.2 : 0.1) : Math.max(0.5, Math.round((hi - lo) / 5 * 2) / 2);
   for (let v = Math.ceil(lo / stepT) * stepT; v <= hi + 1e-9; v += stepT) ticks.push(+v.toFixed(2));
   gridY(svg, y, ticks, m.l, w - m.r, (v) => (acc ? `${Math.round(v * 100)}%` : v.toFixed(1)));
-  for (const s of (w < 560 ? [P.steps[0], 3000, 143000] : [P.steps[0], 3000, 13000, 53000, 143000])) {
-    svg.append(el('text', { x: x(s), y: h - 10, 'text-anchor': s === 143000 ? 'end' : s === P.steps[0] ? 'start' : 'middle' }, s === 143000 ? '143k steps' : stepLabel(s)));
+  for (const s of (w < 560 ? [steps[0], 3000, 143000] : [steps[0], 3000, 13000, 53000, 143000])) {
+    svg.append(el('text', { x: x(s), y: h - 10, 'text-anchor': s === 143000 ? 'end' : s === steps[0] ? 'start' : 'middle' }, s === 143000 ? '143k steps' : stepLabel(s)));
   }
   svg.append(el('text', { x: m.l, y: m.t + 4, dx: 4 }, acc ? '% correct' : 'confidence in right answer'));
   const ends = [];
@@ -290,8 +291,8 @@ function drawPilot(P, opts = {}) {
     const rect = svg.getBoundingClientRect();
     const px = ((evt.clientX - rect.left) / rect.width) * w;
     let best = 0;
-    P.steps.forEach((s, i) => { if (Math.abs(x(s) - px) < Math.abs(x(P.steps[best]) - px)) best = i; });
-    const s = P.steps[best];
+    steps.forEach((s, i) => { if (Math.abs(x(s) - px) < Math.abs(x(steps[best]) - px)) best = i; });
+    const s = steps[best];
     hair.setAttribute('x1', x(s)); hair.setAttribute('x2', x(s)); hair.setAttribute('opacity', 0.35);
     const rowsH = keys.map((k) => { const r = groups[k].series[best]; const f = (v) => (acc ? pct(v) : v.toFixed(2)); return `<div class="tt-row"><span class="tt-dot" style="background:${GROUP[k].color}"></span><span>${GROUP[k].name}</span><span>${f(r[col[0]])} (${f(r[col[1]])} to ${f(r[col[2]])})</span></div>`; }).join('');
     tip.show(`<div class="tt-h">Training step ${fmt(s)}</div>${rowsH}`, (x(s) / w) * rect.width, evt.clientY - rect.top);
@@ -300,7 +301,7 @@ function drawPilot(P, opts = {}) {
   const bname = st.bench === 'all' ? 'All three tests' : BENCH_NAME[st.bench];
   document.getElementById('pilot-title').textContent = `${bname}: ${acc ? 'percent correct' : 'confidence in the right answer'}, Pythia 410M`;
   document.getElementById('pilot-legend').innerHTML = keys.map((k) => `<span><i style="background:${GROUP[k].color}"></i>${GROUP[k].name}</span>`).join('');
-  srTable(box, ['Training step', ...keys.map((k) => GROUP[k].name)], P.steps.map((s, i) => [fmt(s), ...keys.map((k) => { const r = groups[k].series[i]; return acc ? pct(r[1]) : r[4].toFixed(2); })]), document.getElementById('pilot-title').textContent);
+  srTable(box, ['Training step', ...keys.map((k) => GROUP[k].name)], steps.map((s, i) => [fmt(s), ...keys.map((k) => { const r = groups[k].series[i]; return acc ? pct(r[1]) : r[4].toFixed(2); })]), document.getElementById('pilot-title').textContent);
 }
 
 function fillPilot(P) {
@@ -316,8 +317,9 @@ function fillPilot(P) {
   const chk = document.getElementById('pilot-check');
   if (chk && P.accuracy) {
     const benches = Object.keys(P.accuracy);
+    const cell = (b, s) => { const r = P.accuracy[b].find((q) => q[0] === s); return r ? `${pct(r[1])} · ${r[2] == null ? 'n/a' : pct(r[2])}` : 'not yet'; };
     chk.innerHTML = `<table><thead><tr><th>Training step</th>${benches.map((b) => `<th>${BENCH_NAME[b]}: ours · EleutherAI</th>`).join('')}</tr></thead><tbody>${
-      P.steps.map((s, i) => `<tr><td>${fmt(s)}</td>${benches.map((b) => { const r = P.accuracy[b][i]; return `<td>${pct(r[1])} · ${r[2] == null ? 'n/a' : pct(r[2])}</td>`; }).join('')}</tr>`).join('')
+      P.steps.map((s) => `<tr><td>${fmt(s)}</td>${benches.map((b) => `<td>${cell(b, s)}</td>`).join('')}</tr>`).join('')
     }</tbody></table>`;
   }
   const ex = document.getElementById('pilot-examples');

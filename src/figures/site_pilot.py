@@ -50,9 +50,9 @@ def main(argv=None) -> None:
         raise SystemExit("no pilot scores yet: run python -m evals.score_cpu first")
     lam_files = sorted((REPO_ROOT / "data" / "evals" / "pilot" / args.model / "lambada").glob("step*.parquet"))
     df = pd.concat([pd.read_parquet(f) for f in files + lam_files])
-    # checkpoints every benchmark has been scored at (runs can be partway through)
-    steps = sorted(set.intersection(*(set(g["step"].unique().tolist()) for _, g in df.groupby("benchmark"))))
-    df = df[df["step"].isin(steps)]
+    # each benchmark keeps the checkpoints it has been scored at (runs can be partway through);
+    # `steps` is their union, and every series row carries its own step
+    steps = sorted(df["step"].unique().tolist())
 
     published = json.loads((REPO_ROOT / "site" / "data" / "benchmarks.json").read_text())
     pub = {b: {p[0]: p[1] for p in pts} for b, pts in published["series"][f"pythia-{args.model.split('-')[-1]}"].items()} \
@@ -62,7 +62,7 @@ def main(argv=None) -> None:
            "accuracy": {}, "groups": {}, "tier_counts": {}, "examples": []}
     for b, g in df.groupby("benchmark"):
         acc = g.groupby("step")["y"].mean()
-        out["accuracy"][b] = [[int(s), round(float(acc[s]), 4), pub.get(b, {}).get(int(s))] for s in steps]
+        out["accuracy"][b] = [[int(s), round(float(acc[s]), 4), pub.get(b, {}).get(int(s))] for s in sorted(acc.index)]
 
     tiers_path = REPO_ROOT / "data" / "exposure" / "pilot_tiers.parquet"
     if tiers_path.exists():
@@ -79,14 +79,16 @@ def main(argv=None) -> None:
                 "q_count": lam["count"].astype(int), "qa_count": lam["count"].astype(int)})], ignore_index=True)
         out["tier_counts"] = {b: {k: int(v) for k, v in g["tier"].value_counts().items()} for b, g in tiers.groupby("benchmark")}
         m = df.drop(columns=["tier", "t0", "n"], errors="ignore").merge(tiers, on=["benchmark", "item_id"], how="inner")
-        for b, gb in list(m.groupby("benchmark")) + [("all", m)]:
+        pilot_three = m[m["benchmark"] != "lambada"]
+        common = set.intersection(*(set(g["step"]) for _, g in pilot_three.groupby("benchmark"))) if len(pilot_three) else set()
+        for b, gb in list(m.groupby("benchmark")) + [("all", pilot_three[pilot_three["step"].isin(common)])]:
             out["groups"][b] = {}
             for t in GROUPS:
                 gt = gb[gb["tier"] == t]
                 if gt.empty:
                     continue
                 series = []
-                for s in steps:
+                for s in sorted(gt["step"].unique()):
                     gs = gt[gt["step"] == s]
                     y, lp = gs["y"].to_numpy(float), gs["logp"].to_numpy(float)
                     series.append([int(s), round(float(y.mean()), 4), *[round(v, 4) for v in boot_ci(y)],

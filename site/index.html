@@ -177,7 +177,7 @@
           <p class="pilot__note">“Confidence” is the log-probability the AI gives the right answer: higher means more sure. It moves more smoothly than right or wrong.</p>
         </form>
       </div>
-      <p class="show__start">This compares groups of questions. It does not yet show that reading a question <i>caused</i> a better score: found passages may differ in other ways. Testing cause is the next step of the study.</p>
+      <p class="show__start"><b>First result:</b> LAMBADA passages that were in Pythia’s reading are <b>not</b> answered better than ones that were not. At the end of training it gets 49% of the found passages right and 53% of the others, and the 95% ranges overlap. This compares different passages, so it cannot show what reading a passage did to its score: found passages may simply be harder. Testing that, passage by passage, before and after the moment each was read, is the next step of the study.</p>
       <details class="table-view"><summary>Our scores next to the makers’ published scores</summary><div class="scroll" id="pilot-check"></div></details>
       <details class="table-view"><summary>How many questions fall in each group</summary><div class="scroll" id="pilot-counts"></div></details>
       <div class="pilot__examples" hidden>
