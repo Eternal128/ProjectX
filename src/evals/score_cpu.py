@@ -122,7 +122,8 @@ def main(argv=None) -> None:
         print(f"step{step}: {len(df)} items in {time.time() - t0:.0f}s, accuracy {acc}", flush=True)
         del model
         if not args.keep_cache:
-            for d in cache.glob(f"models--{args.model.replace('/', '--')}/blobs"):
+            # newer huggingface_hub versions keep files in a shared cache/blobs folder, older ones per model
+            for d in [cache / "blobs", *cache.glob(f"models--{args.model.replace('/', '--')}/blobs")]:
                 shutil.rmtree(d, ignore_errors=True)
 
 
