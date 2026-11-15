@@ -52,10 +52,10 @@ def targets(source: str) -> list[dict]:
         items = {(it["benchmark"], it["item_id"]): it for it in load_items()}
         return [{"benchmark": r.benchmark, "item_id": r.item_id, "tier": r.tier, "copies_found": int(r.q_count),
                  "query": clean_text(items[(r.benchmark, r.item_id)]["question"])} for r in found.itertuples()]
-    if source == "lambada":
+    if source in ("lambada", "lambada_all"):
         from exposure.probe_coverage import download, LAMBADA_URL, windows
 
-        probe = pd.read_parquet(exp / "probe_coverage.parquet")
+        probe = pd.read_parquet(exp / ("probe_coverage.parquet" if source == "lambada" else "lambada_coverage_all.parquet"))
         hits = probe[(probe["benchmark"] == "lambada") & (probe["count"] > 0)]
         lam = [json.loads(x) for x in download(LAMBADA_URL, "lambada_test_en.jsonl").read_text().splitlines() if x.strip()]
         return [{"benchmark": "lambada", "item_id": r.item_id, "tier": "window", "copies_found": int(r.count),
@@ -75,8 +75,9 @@ def passes_timing(t0, checkpoints, total_steps: int, cfg: dict) -> bool:
 def main(argv=None) -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--config", default="configs/exposure.yaml")
-    ap.add_argument("--source", choices=["pilot", "lambada"], default="pilot",
-                    help="pilot: found SciQ / ARC-Easy / PIQA questions; lambada: LAMBADA passages found by the coverage probe")
+    ap.add_argument("--source", choices=["pilot", "lambada", "lambada_all"], default="pilot",
+                    help="pilot: found SciQ / ARC-Easy / PIQA questions; lambada: LAMBADA passages found by the "
+                         "coverage probe's sample; lambada_all: every LAMBADA passage found (probe_coverage --lambada-all)")
     ap.add_argument("--max-copies", type=int, default=50)
     ap.add_argument("--workers", type=int, default=4)
     args = ap.parse_args(argv)

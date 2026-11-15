@@ -75,6 +75,8 @@ def main(argv=None) -> None:
     ap.add_argument("--config", default="configs/exposure.yaml")
     ap.add_argument("--sample", type=int, default=500, help="items sampled from LAMBADA and from TriviaQA")
     ap.add_argument("--seed", type=int, default=20260101)
+    ap.add_argument("--lambada-all", action="store_true",
+                    help="search every LAMBADA passage (5,153) instead of the sample; writes lambada_coverage_all.parquet")
     args = ap.parse_args(argv)
     client = InfiniGramClient.from_config(load_config(args.config))
     rows: list[dict] = []
@@ -86,6 +88,18 @@ def main(argv=None) -> None:
         if len(rows) % 500 == 0:
             print(f"{len(rows)} queries, {time.time() - t_start:.0f}s", flush=True)
         return n
+
+    if args.lambada_all:
+        lam = [json.loads(line) for line in download(LAMBADA_URL, "lambada_test_en.jsonl").read_text().splitlines() if line.strip()]
+        for i, r in enumerate(lam):
+            w = windows(clean_text(r["text"]))
+            if w:
+                add("lambada", i, "window_last", w["last"])
+        df = pd.DataFrame(rows)
+        write_parquet(df, "data/exposure/lambada_coverage_all.parquet",
+                      provenance({"window": WINDOW, "lambada": LAMBADA_URL, "all": True}, args.config))
+        print(summarise(df).to_string(index=False))
+        return
 
     # 1. 13-word windows of every pilot question long enough to have one
     for it in load_items():
