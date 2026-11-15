@@ -9,7 +9,9 @@ data/exposure/pilot_tiers.parquet (Pile search). Writes:
   - per exposure group (confirmed / question_only / clean): accuracy and mean
     log-probability of the right answer at each checkpoint, with 95% bootstrap
     intervals over items;
-  - how many items fall in each group, and a few confirmed examples.
+  - how many items fall in each group, and a few confirmed examples;
+  - when data/exposure/probe_coverage.parquet exists, the share of items found by the
+    wider coverage probe (13-word windows, LAMBADA and TriviaQA samples), with 95% intervals.
 
 This is descriptive: it compares seen and unseen items over training. It does not
 estimate the step each item was first read (that needs the preshuffled training data),
@@ -83,6 +85,11 @@ def main(argv=None) -> None:
             it = items[(r.benchmark, r.item_id)]
             out["examples"].append({"benchmark": r.benchmark, "question": it["question"], "answer": it["answer_text"],
                                     "copies": int(r.qa_count)})
+    cov_path = REPO_ROOT / "data" / "exposure" / "probe_coverage.parquet"
+    if cov_path.exists():
+        from exposure.probe_coverage import summarise
+
+        out["coverage"] = summarise(pd.read_parquet(cov_path)).to_dict(orient="records")
     out["provenance"] = provenance({"model": args.model, "steps": steps})
     path = REPO_ROOT / args.out
     path.write_text(json.dumps(out, separators=(",", ":")) + "\n")
