@@ -90,7 +90,14 @@ def main(argv=None) -> None:
     print(f"{len(copies)} copies of {copies[['benchmark', 'item_id']].drop_duplicates().shape[0]} items", flush=True)
 
     rows = []
+    part_dir = REPO_ROOT / "data" / "exposure" / "seed_dates_parts"
+    part_dir.mkdir(parents=True, exist_ok=True)
     for seed in [0, *args.seeds]:
+        part = part_dir / f"seed{seed}.parquet"
+        if part.exists() and seed != 0:  # finished earlier: reuse, so a stopped run resumes
+            rows += pd.read_parquet(part).to_dict("records")
+            print(f"seed {seed}: already done", flush=True)
+            continue
         order = TrainingOrder(fetch_maps(seed) if seed else STEP_DIR / "seed0", name=maps_name(seed))
         for c in copies.itertuples():
             s = sample_holding(order, c.neox_doc, c.offset)
@@ -98,6 +105,7 @@ def main(argv=None) -> None:
             rows.append({"benchmark": c.benchmark, "item_id": c.item_id, "neox_doc": c.neox_doc, "offset": c.offset,
                          "seed": seed, "position": pos,
                          "step": pos // BATCH + 1 if 0 <= pos < TRAINED_SAMPLES else -1})
+        pd.DataFrame([r for r in rows if r["seed"] == seed]).to_parquet(part, index=False)
         if seed == 0:
             # the check: index arithmetic must agree with the batches date_items read
             mine = pd.DataFrame([r for r in rows if r["seed"] == 0]).merge(copies, on=["benchmark", "item_id", "neox_doc", "offset"])
@@ -108,6 +116,9 @@ def main(argv=None) -> None:
             if not args.keep_maps:
                 shutil.rmtree(STEP_DIR / f"seed{seed}", ignore_errors=True)
         del order
+        import gc
+
+        gc.collect()
 
     df = pd.DataFrame(rows)
     prov = provenance({"sources": args.sources, "seeds": [0, *args.seeds]})

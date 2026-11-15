@@ -23,7 +23,6 @@ does not matter at checkpoint spacing but is kept consistent.
 from __future__ import annotations
 
 import struct
-from functools import lru_cache
 from pathlib import Path
 
 import numpy as np
@@ -171,8 +170,8 @@ class TrainingOrder:
                 self._pos_cache = None
         return self._pos_cache
 
-    @lru_cache(maxsize=None)
     def doc_position(self, doc: int) -> np.ndarray:
+        # no functools.lru_cache here: on a method it holds `self` (2 GB of maps) forever
         inv = self._doc_positions
         if inv is not None:
             return np.array([inv[doc]])
