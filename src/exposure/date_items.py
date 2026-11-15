@@ -91,8 +91,20 @@ def main(argv=None) -> None:
     todo = targets(args.source)
 
     _ = order._doc_positions  # build the reverse lookup once, before the worker threads
+    # progress is appended per item, so a stopped run resumes where it left off
+    import threading
+
+    part = REPO_ROOT / "data" / "exposure" / f"{args.source}_dates_part.jsonl"
+    done = {}
+    if part.exists():
+        for line in part.read_text().splitlines():
+            rec = json.loads(line)
+            done[(rec["benchmark"], rec["item_id"])] = rec["rows"]
+    lock = threading.Lock()
 
     def date_one(t: dict) -> list[dict]:
+        if (t["benchmark"], t["item_id"]) in done:
+            return done[(t["benchmark"], t["item_id"])]
         out = []
         q, needle = t["query"], needle_of(tok, t["query"])
         hit = client.request("find", query=q)
@@ -103,7 +115,7 @@ def main(argv=None) -> None:
             base = {"benchmark": t["benchmark"], "item_id": t["item_id"], "tier": t["tier"], "ig_doc": int(d["doc_ix"]),
                     "source": f'{meta.get("path")}:{meta.get("linenum")}',
                     "pile_set": meta.get("metadata", {}).get("meta", {}).get("pile_set_name")}
-            docs = find_neox_docs(pile, base["ig_doc"], needle)
+            docs = find_neox_docs(pile, base["ig_doc"], needle, ig_len=d.get("doc_len"))
             if not docs:
                 out.append({**base, "neox_doc": -1, "sample": -1, "position": -1, "step": -1, "verified": False})
                 continue
@@ -116,6 +128,8 @@ def main(argv=None) -> None:
                                 "step": pos // BATCH + 1 if trained else -1, "verified": ok})
         n_ok = len({x["position"] for x in out if x["verified"]})
         print(f"{t['benchmark']} {t['item_id']}: {len(ranks)} copies, {n_ok} verified training samples", flush=True)
+        with lock, part.open("a") as fh:
+            fh.write(json.dumps({"benchmark": t["benchmark"], "item_id": t["item_id"], "rows": out}, default=int) + "\n")
         return out
 
     from concurrent.futures import ThreadPoolExecutor

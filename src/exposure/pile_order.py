@@ -48,9 +48,21 @@ DRIFT_PER_DOC = 1.32e-5
 NARROW_WINDOW = 300
 
 
-def find_neox_docs(pile: "TokenizedPile", ig_doc: int, needle: np.ndarray) -> list[int]:
-    """Pythia's document numbers that hold `needle`, near infini-gram's document `ig_doc`."""
+def find_neox_docs(pile: "TokenizedPile", ig_doc: int, needle: np.ndarray, ig_len: int | None = None) -> list[int]:
+    """Pythia's document numbers that hold `needle`, near infini-gram's document `ig_doc`.
+
+    With `ig_len` (infini-gram's length of the document, in its own tokens) only nearby
+    documents of a similar length are read first: Pile books run to hundreds of thousands of
+    tokens, so reading every document in the window would cost 100 MB or more."""
     guess = ig_doc - int(round(ig_doc * DRIFT_PER_DOC))
+    if ig_len:
+        lo = max(0, guess - NARROW_WINDOW)
+        sizes = pile.sizes(lo, guess + NARROW_WINDOW)
+        near = np.flatnonzero((sizes >= 0.7 * ig_len) & (sizes <= 1.4 * ig_len))
+        for k in sorted(near.tolist(), key=lambda k: abs(lo + k - guess)):
+            toks, _ = pile.window(lo + k, lo + k + 1)
+            if find_subsequence(toks, needle):
+                return [lo + k]
     for lo, hi in ((guess - NARROW_WINDOW, guess + NARROW_WINDOW), (ig_doc - DOC_WINDOW, ig_doc + DOC_WINDOW)):
         lo = max(0, lo)
         toks, starts = pile.window(lo, hi)
