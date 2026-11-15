@@ -137,13 +137,13 @@ def _invert(perm, chunk: int = 8_000_000) -> np.ndarray:
 class TrainingOrder:
     """Pythia's training order (standard Pile, seed 1234) from GPT-NeoX index maps on disk."""
 
-    def __init__(self, maps_dir: str | Path | None = None):
+    def __init__(self, maps_dir: str | Path | None = None, name: str = MAPS):
         d = Path(maps_dir) if maps_dir else REPO_ROOT / "data" / "step_mapping" / "seed0"
-        self.doc_idx = np.load(d / f"{MAPS}_doc_idx.npy", mmap_mode="r")
-        self.sample_idx = np.load(d / f"{MAPS}_sample_idx.npy", mmap_mode="r")
+        self.doc_idx = np.load(d / f"{name}_doc_idx.npy", mmap_mode="r")
+        self.sample_idx = np.load(d / f"{name}_sample_idx.npy", mmap_mode="r")
         # int32 is enough (162M samples, 210M documents); built in chunks from a memory map so
         # the job fits in memory next to the scoring runs
-        self.inverse = _invert(np.load(d / f"{MAPS}_shuffle_idx.npy", mmap_mode="r"))
+        self.inverse = _invert(np.load(d / f"{name}_shuffle_idx.npy", mmap_mode="r"))
         # one contiguous copy: searchsorted on the strided mmap column would copy it on every call
         self._sample_doc = np.ascontiguousarray(self.sample_idx[:, 0])
 
