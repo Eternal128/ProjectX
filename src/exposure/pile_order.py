@@ -125,6 +125,15 @@ def find_subsequence(hay: np.ndarray, needle: np.ndarray) -> list[int]:
     return cand.tolist()
 
 
+def _invert(perm, chunk: int = 8_000_000) -> np.ndarray:
+    """Inverse of a permutation of 0..n-1, as int32, without full-size temporaries."""
+    inv = np.empty(len(perm), dtype=np.int32)
+    for a in range(0, len(perm), chunk):
+        b = min(a + chunk, len(perm))
+        inv[np.asarray(perm[a:b])] = np.arange(a, b, dtype=np.int32)
+    return inv
+
+
 class TrainingOrder:
     """Pythia's training order (standard Pile, seed 1234) from GPT-NeoX index maps on disk."""
 
@@ -132,12 +141,11 @@ class TrainingOrder:
         d = Path(maps_dir) if maps_dir else REPO_ROOT / "data" / "step_mapping" / "seed0"
         self.doc_idx = np.load(d / f"{MAPS}_doc_idx.npy", mmap_mode="r")
         self.sample_idx = np.load(d / f"{MAPS}_sample_idx.npy", mmap_mode="r")
-        shuffle = np.load(d / f"{MAPS}_shuffle_idx.npy")
-        # int32 is enough (162M samples, 210M documents) and halves memory next to the scoring runs
-        self.inverse = np.empty(len(shuffle), dtype=np.int32)
-        self.inverse[shuffle] = np.arange(len(shuffle), dtype=np.int32)
-        del shuffle
-        self._sample_doc = np.asarray(self.sample_idx[:, 0])
+        # int32 is enough (162M samples, 210M documents); built in chunks from a memory map so
+        # the job fits in memory next to the scoring runs
+        self.inverse = _invert(np.load(d / f"{MAPS}_shuffle_idx.npy", mmap_mode="r"))
+        # one contiguous copy: searchsorted on the strided mmap column would copy it on every call
+        self._sample_doc = np.ascontiguousarray(self.sample_idx[:, 0])
 
     @property
     def _doc_positions(self):
@@ -146,9 +154,7 @@ class TrainingOrder:
         if not hasattr(self, "_pos_cache"):
             d = np.asarray(self.doc_idx)
             if len(d) == d.max() + 1:
-                inv = np.empty(len(d), dtype=np.int32)
-                inv[d] = np.arange(len(d), dtype=np.int32)
-                self._pos_cache = inv
+                self._pos_cache = _invert(d)
             else:
                 self._pos_cache = None
         return self._pos_cache
