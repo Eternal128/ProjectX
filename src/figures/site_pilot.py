@@ -48,7 +48,8 @@ def main(argv=None) -> None:
     files = sorted((REPO_ROOT / "data" / "evals" / "pilot" / args.model).glob("step*.parquet"))
     if not files:
         raise SystemExit("no pilot scores yet: run python -m evals.score_cpu first")
-    df = pd.concat([pd.read_parquet(f) for f in files])
+    lam_files = sorted((REPO_ROOT / "data" / "evals" / "pilot" / args.model / "lambada").glob("step*.parquet"))
+    df = pd.concat([pd.read_parquet(f) for f in files + lam_files])
     steps = sorted(df["step"].unique().tolist())
 
     published = json.loads((REPO_ROOT / "site" / "data" / "benchmarks.json").read_text())
@@ -64,8 +65,18 @@ def main(argv=None) -> None:
     tiers_path = REPO_ROOT / "data" / "exposure" / "pilot_tiers.parquet"
     if tiers_path.exists():
         tiers = pd.read_parquet(tiers_path)[["benchmark", "item_id", "tier", "q_count", "qa_count"]]
+        cov_path = REPO_ROOT / "data" / "exposure" / "probe_coverage.parquet"
+        if lam_files and cov_path.exists():
+            # LAMBADA: the probe's 13-word window ends in the answer word, so a hit means the
+            # passage and its answer were in the Pile ("confirmed"); no hit means "clean"
+            cov = pd.read_parquet(cov_path)
+            lam = cov[cov["benchmark"] == "lambada"].groupby("item_id")["count"].max().reset_index()
+            tiers = pd.concat([tiers, pd.DataFrame({
+                "benchmark": "lambada", "item_id": "lambada-" + lam["item_id"].astype(str),
+                "tier": ["confirmed" if c > 0 else "clean" for c in lam["count"]],
+                "q_count": lam["count"].astype(int), "qa_count": lam["count"].astype(int)})], ignore_index=True)
         out["tier_counts"] = {b: {k: int(v) for k, v in g["tier"].value_counts().items()} for b, g in tiers.groupby("benchmark")}
-        m = df.merge(tiers, on=["benchmark", "item_id"], how="inner")
+        m = df.drop(columns=["tier", "t0", "n"], errors="ignore").merge(tiers, on=["benchmark", "item_id"], how="inner")
         for b, gb in list(m.groupby("benchmark")) + [("all", m)]:
             out["groups"][b] = {}
             for t in GROUPS:
@@ -79,12 +90,24 @@ def main(argv=None) -> None:
                     series.append([int(s), round(float(y.mean()), 4), *[round(v, 4) for v in boot_ci(y)],
                                    round(float(lp.mean()), 4), *[round(v, 4) for v in boot_ci(lp)]])
                 out["groups"][b][t] = {"n": int(gt["item_id"].nunique()), "series": series}
-        items = {(it["benchmark"], it["item_id"]): it for it in load_items()}
-        conf = tiers[tiers["tier"] == "confirmed"].sort_values("qa_count", ascending=False)
+        all_items = load_items()
+        lam_items = REPO_ROOT / "data" / "raw" / "items_lambada.jsonl"
+        if lam_items.exists():
+            all_items += load_items(lam_items)
+        items = {(it["benchmark"], it["item_id"]): it for it in all_items}
+        conf = tiers[(tiers["tier"] == "confirmed") & (tiers["benchmark"] != "lambada")].sort_values("qa_count", ascending=False)
         for r in conf.head(6).itertuples():
             it = items[(r.benchmark, r.item_id)]
             out["examples"].append({"benchmark": r.benchmark, "question": it["question"], "answer": it["answer_text"],
                                     "copies": int(r.qa_count)})
+    for source in ("pilot", "lambada"):
+        fe = REPO_ROOT / "data" / "exposure" / f"{source}_first_exposure.parquet"
+        if fe.exists():
+            f = pd.read_parquet(fe)
+            out.setdefault("dates", {})[source] = {
+                "items": int(len(f)), "dated": int(f["t0"].notna().sum()), "pass_timing": int(f["passes_timing"].sum()) if "passes_timing" in f else None,
+                "t0": sorted(int(t) for t in f["t0"].dropna()),
+            }
     cov_path = REPO_ROOT / "data" / "exposure" / "probe_coverage.parquet"
     if cov_path.exists():
         from exposure.probe_coverage import summarise

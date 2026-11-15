@@ -6,7 +6,7 @@ const NS = 'http://www.w3.org/2000/svg';
 const COLORS = { '410m': 'var(--series-1)', '1.4b': 'var(--series-2)', '2.8b': 'var(--series-3)' };
 const SIZE_LABEL = { '410m': '410M', '1.4b': '1.4B', '2.8b': '2.8B' };
 const SIZE_NAME = { '410m': 'Small, 410M', '1.4b': 'Medium, 1.4B', '2.8b': 'Large, 2.8B' };
-const BENCH_NAME = { lambada: 'LAMBADA', piqa: 'PIQA', sciq: 'SciQ', arc_easy: 'ARC-Easy', mmlu: 'MMLU' };
+const BENCH_NAME = { lambada: 'LAMBADA', piqa: 'PIQA', sciq: 'SciQ', arc_easy: 'ARC-Easy', mmlu: 'MMLU', triviaqa: 'TriviaQA' };
 const DESIGN = {
   total: 143000,
   checkpoints: [512, 1000, 2000, 3000, 4000, 6000, 8000, 10000, 13000, 16000, 20000, 24000, 28000, 33000, 38000,
@@ -238,6 +238,10 @@ function pilotState() {
 function drawPilot(P, opts = {}) {
   const box = document.getElementById('pilot-chart');
   if (!box || !P.groups) return;
+  // tests without scores yet are disabled; fall back to the first one that has them
+  const radios = [...document.querySelectorAll('#pilot-controls input[name="pbench"]')];
+  radios.forEach((r) => { const ok = !!P.groups[r.value]; r.disabled = !ok; r.closest('label').classList.toggle('is-off', !ok); });
+  if (!P.groups[pilotState().bench]) { const first = radios.find((r) => !r.disabled); if (first) first.checked = true; }
   const st = pilotState();
   const { svg, w, h } = frame(box);
   const m = { l: 52, r: w < 560 ? 96 : 120, t: 12, b: 34 };
@@ -251,14 +255,15 @@ function drawPilot(P, opts = {}) {
   const pad = (hi - lo) * 0.08 || 0.05;
   lo -= pad; hi += pad;
   if (acc) { lo = Math.max(0, Math.floor(lo * 10) / 10); hi = Math.min(1, Math.ceil(hi * 10) / 10); }
-  const x = symlog(DESIGN.total, m.l, w - m.r);
+  const l0 = Math.log10(P.steps[0]), l1 = Math.log10(DESIGN.total);
+  const x = (v) => m.l + ((Math.log10(v) - l0) / (l1 - l0)) * (w - m.l - m.r);
   const y = linear(lo, hi, h - m.b, m.t);
   const ticks = [];
   const stepT = acc ? (hi - lo > 0.5 ? 0.2 : 0.1) : Math.max(0.5, Math.round((hi - lo) / 5 * 2) / 2);
   for (let v = Math.ceil(lo / stepT) * stepT; v <= hi + 1e-9; v += stepT) ticks.push(+v.toFixed(2));
   gridY(svg, y, ticks, m.l, w - m.r, (v) => (acc ? `${Math.round(v * 100)}%` : v.toFixed(1)));
-  for (const s of P.steps) if ([512, 3000, 13000, 53000, 143000].includes(s)) {
-    svg.append(el('text', { x: x(s), y: h - 10, 'text-anchor': s === 143000 ? 'end' : 'middle' }, stepLabel(s)));
+  for (const s of (w < 560 ? [P.steps[0], 3000, 143000] : [P.steps[0], 3000, 13000, 53000, 143000])) {
+    svg.append(el('text', { x: x(s), y: h - 10, 'text-anchor': s === 143000 ? 'end' : s === P.steps[0] ? 'start' : 'middle' }, s === 143000 ? '143k steps' : stepLabel(s)));
   }
   svg.append(el('text', { x: m.l, y: m.t + 4, dx: 4 }, acc ? '% correct' : 'confidence in right answer'));
   const ends = [];
@@ -320,6 +325,49 @@ function fillPilot(P) {
     ex.innerHTML = P.examples.map((e) => `<li><p class="pilot__q">“${e.question.replace(/</g, '&lt;')}”</p><p class="pilot__a">Answer: ${e.answer.replace(/</g, '&lt;')} · ${BENCH_NAME[e.benchmark]} · found ${fmt(e.copies)} ${e.copies === 1 ? 'time' : 'times'}</p></li>`).join('');
     ex.closest('.pilot__examples').hidden = false;
   }
+}
+
+function drawCoverage(P) {
+  const box = document.getElementById('cov-chart');
+  if (!box || !P.coverage) return;
+  const rows = P.coverage.filter((r) => r.check !== 'question found').sort((a, b) => b.share - a.share);
+  const { svg, w } = frame(box, 40 + rows.length * 44);
+  const m = { l: w < 480 ? 92 : 120, r: 92, t: 22 };
+  const hi = Math.max(0.3, Math.ceil(Math.max(...rows.map((r) => r.ci_high)) * 10) / 10);
+  const x = linear(0, hi, m.l, w - m.r);
+  for (const v of [0, 0.1, 0.2, 0.3].filter((t) => t <= hi + 1e-9)) {
+    svg.append(el('line', { x1: x(v), x2: x(v), y1: m.t - 6, y2: 40 + rows.length * 44 - 14, stroke: 'var(--grid)' }));
+    svg.append(el('text', { x: x(v), y: m.t - 10, 'text-anchor': 'middle' }, `${Math.round(v * 100)}%`));
+  }
+  rows.forEach((r, i) => {
+    const y = m.t + 18 + i * 44;
+    const strong = r.share > 0.1;
+    svg.append(el('text', { x: m.l - 10, y: y + 4, 'text-anchor': 'end', class: 't-ink' }, BENCH_NAME[r.benchmark] || (r.benchmark === 'triviaqa' ? 'TriviaQA' : r.benchmark)));
+    svg.append(el('line', { x1: x(r.ci_low), x2: x(r.ci_high), y1: y, y2: y, stroke: strong ? 'var(--series-1)' : 'var(--axis)', 'stroke-width': 2 }));
+    svg.append(el('rect', { x: x(0), y: y - 9, width: Math.max(2, x(r.share) - x(0)), height: 18, rx: 3, fill: strong ? 'var(--series-1)' : 'var(--axis)', 'fill-opacity': strong ? 0.9 : 0.5 }));
+    svg.append(el('text', { x: x(r.ci_high) + 8, y: y + 4, class: strong ? 't-strong' : '' }, `${pct(r.share, 1)} of ${fmt(r.items)}`));
+  });
+  srTable(box, ['Test', 'Share found', '95% range', 'Checked'], rows.map((r) => [BENCH_NAME[r.benchmark] || r.benchmark, pct(r.share), `${pct(r.ci_low)} to ${pct(r.ci_high)}`, fmt(r.items)]), 'Share of test items found word for word in the Pile');
+}
+
+function drawDates(P) {
+  const box = document.getElementById('dates-chart');
+  if (!box || !P.dates) return;
+  const sets = Object.entries(P.dates).filter(([, d]) => d.t0.length);
+  const H = 44 + sets.length * 46;
+  const { svg, w } = frame(box, H);
+  const m = { l: w < 480 ? 92 : 120, r: 20 };
+  const x = linear(0, DESIGN.total, m.l, w - m.r);
+  svg.append(el('rect', { x: x(DESIGN.filter.lo * DESIGN.total), y: 8, width: x(DESIGN.filter.hi * DESIGN.total) - x(DESIGN.filter.lo * DESIGN.total), height: H - 40, rx: 6, fill: '#e9f8ef' }));
+  svg.append(el('text', { x: x(0.5 * DESIGN.total), y: 22, 'text-anchor': 'middle' }, 'usable for the main study if first read in here'));
+  sets.forEach(([key, d], i) => {
+    const y = 48 + i * 46;
+    svg.append(el('text', { x: m.l - 10, y: y + 4, 'text-anchor': 'end', class: 't-ink' }, key === 'pilot' ? 'SciQ, ARC, PIQA' : 'LAMBADA'));
+    svg.append(el('line', { x1: m.l, x2: w - m.r, y1: y, y2: y, stroke: 'var(--grid)' }));
+    for (const t of d.t0) svg.append(el('circle', { cx: x(t), cy: y, r: 4.5, fill: key === 'pilot' ? 'var(--series-2)' : 'var(--series-1)', 'fill-opacity': 0.7, stroke: 'var(--bg)', 'stroke-width': 1 }));
+  });
+  for (const s of (w < 560 ? [0, 71500, 143000] : [0, 35750, 71500, 107250, 143000])) svg.append(el('text', { x: x(s), y: H - 8, 'text-anchor': s === 0 ? 'start' : s === 143000 ? 'end' : 'middle' }, s === 143000 ? '143k steps' : stepLabel(s)));
+  srTable(box, ['Test', 'Items dated', 'First-read steps'], sets.map(([k, d]) => [k === 'pilot' ? 'SciQ, ARC-Easy, PIQA' : 'LAMBADA', fmt(d.dated), d.t0.map(fmt).join(', ')]), 'Training step at which Pythia first read each found item');
 }
 
 // ---------- event study stage (simulated) ----------
@@ -551,6 +599,9 @@ async function getJSON(path) {
     document.getElementById('pilot').hidden = false;
     fillPilot(P);
     drawPilot(P, { animate: false });
+    drawCoverage(P);
+    drawDates(P);
+    new ResizeObserver(() => { drawCoverage(P); drawDates(P); }).observe(document.getElementById('cov-chart'));
     document.getElementById('pilot-controls').addEventListener('change', () => drawPilot(P));
     new ResizeObserver(() => drawPilot(P, { animate: false })).observe(document.getElementById('pilot-chart'));
   }

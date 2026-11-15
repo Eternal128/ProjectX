@@ -124,6 +124,69 @@
     </div>
   </section>
 
+  <section class="show pilot" id="pilot" aria-labelledby="pilot-h" hidden>
+    <div class="show__inner">
+      <h2 id="pilot-h" class="section-h" data-reveal>First real measurements</h2>
+      <p class="section-p" data-reveal style="--d:1">We tested the smallest model we study, Pythia 410M, at 10 snapshots from early to late training, on 5,714 test questions. We also searched everything it read for every one of those questions. These are real results, not practice data.</p>
+
+      <div class="proofs__list pilot__facts">
+        <article class="proof" data-reveal>
+          <div class="proof__panel" data-ui><div class="chart" id="cov-chart" role="img" aria-label="Share of each test found word for word in Pythia's reading material, with 95% ranges."></div></div>
+          <div>
+            <h3>Most test questions were never in its reading</h3>
+            <p>Only <b>14 of 5,214</b> science and common-sense questions (SciQ, ARC-Easy, PIQA) appear word for word in the Pile, the text Pythia learned from. Checking shorter 13-word stretches finds only a handful more.</p>
+            <p>LAMBADA is different. Its passages come from novels, and <b>about 1 in 4</b> of them is in the Pile. So LAMBADA is where reading the test can show up in the score.</p>
+            <p class="soft">Exact matching misses reworded copies, so these are lower limits.</p>
+          </div>
+        </article>
+        <article class="proof" data-reveal>
+          <div class="proof__panel" data-ui><div class="chart" id="dates-chart" role="img" aria-label="Training step at which Pythia first read each found test item."></div></div>
+          <div>
+            <h3>We can tell when it read them</h3>
+            <p>Pythia’s makers published the exact order it read everything in. Using it, we find the training step at which each found question was read, then open that step’s batch of text to check the question is really there.</p>
+            <p>For example, the ARC-Easy question “Which of the following symbiotic relationships is considered parasitic?” was read at <b>step 23,734</b> and again at step 133,946. Each dot is the first time one item was read.</p>
+          </div>
+        </article>
+      </div>
+
+      <div class="panel" data-ui data-reveal>
+        <div class="panel__demo">
+          <div class="panel__caption">
+            <h3 id="pilot-title">Percent correct</h3>
+            <div class="legend" id="pilot-legend"></div>
+          </div>
+          <div class="chart" id="pilot-chart" role="img" aria-labelledby="pilot-title"></div>
+          <p class="panel__source">Shaded bands are 95% ranges. Groups with fewer than 10 questions are not drawn. Moving right means more training; the left side is stretched.</p>
+        </div>
+        <form class="panel__controls" id="pilot-controls" aria-label="Chart options">
+          <fieldset class="ctl-group">
+            <legend>Test</legend>
+            <label class="ctl-row"><span>LAMBADA, last word</span><input type="radio" name="pbench" value="lambada" checked></label>
+            <label class="ctl-row"><span>SciQ, ARC and PIQA together</span><input type="radio" name="pbench" value="all"></label>
+            <label class="ctl-row"><span>ARC-Easy, science</span><input type="radio" name="pbench" value="arc_easy"></label>
+            <label class="ctl-row"><span>SciQ, science</span><input type="radio" name="pbench" value="sciq"></label>
+            <label class="ctl-row"><span>PIQA, common sense</span><input type="radio" name="pbench" value="piqa"></label>
+          </fieldset>
+          <fieldset class="ctl-group">
+            <legend>Measure</legend>
+            <div class="seg">
+              <label><input type="radio" name="pmeasure" value="acc" checked>Percent correct</label>
+              <label><input type="radio" name="pmeasure" value="logp">Confidence</label>
+            </div>
+          </fieldset>
+          <p class="pilot__note">“Confidence” is the log-probability the AI gives the right answer: higher means more sure. It moves more smoothly than right or wrong.</p>
+        </form>
+      </div>
+      <p class="show__start">This compares groups of questions. It does not yet show that reading a question <i>caused</i> a better score: found passages may differ in other ways. Testing cause is the next step of the study.</p>
+      <details class="table-view"><summary>Our scores next to the makers’ published scores</summary><div class="scroll" id="pilot-check"></div></details>
+      <details class="table-view"><summary>How many questions fall in each group</summary><div class="scroll" id="pilot-counts"></div></details>
+      <div class="pilot__examples" hidden>
+        <h3 class="ctl-heading">Test questions found in Pythia’s reading, with their answers</h3>
+        <ul id="pilot-examples"></ul>
+      </div>
+    </div>
+  </section>
+
   <section class="how" id="method" aria-labelledby="how-h">
     <h2 id="how-h" class="section-h" data-reveal>How we will measure memory</h2>
     <p class="section-p" data-reveal style="--d:1">The real measurement needs months of data work first. So here is our method running on practice data we made up, where we already know the right answer. This is not a result about Pythia yet.</p>

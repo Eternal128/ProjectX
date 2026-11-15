@@ -407,3 +407,13 @@ fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
   .line-draw { stroke-dasharray: var(--len); stroke-dashoffset: var(--len); animation: draw 1100ms var(--ease-out) forwards; }
   @keyframes draw { to { stroke-dashoffset: 0; } }
 }
+
+/* pilot: first real measurements */
+.pilot__facts { margin: 48px 0 64px; gap: 72px; }
+.pilot__facts .proof__panel .chart { height: auto; }
+.ctl-row.is-off { opacity: 0.45; cursor: not-allowed; }
+.pilot__note { margin-top: 14px; font-size: 13px; color: var(--muted); line-height: 1.45; }
+.pilot__examples { margin-top: 28px; }
+.pilot__examples ul { list-style: none; padding: 0; margin: 10px 0 0; display: grid; gap: 12px; }
+.pilot__q { font-size: var(--step-body); }
+.pilot__a { font-size: 13px; color: var(--muted); margin-top: 2px; }
