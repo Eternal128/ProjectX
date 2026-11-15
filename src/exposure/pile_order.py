@@ -34,6 +34,8 @@ HF = "https://huggingface.co/datasets/EleutherAI"
 IDXMAP = f"{HF}/pythia_pile_idxmaps/resolve/main/pile_20B_tokenizer_text_document"
 IDXMAP_SHARD_BYTES = 5_000_000_000
 PRESHUFFLED = f"{HF}/pile-standard-pythia-preshuffled/resolve/main/document"
+DEDUP_IDXMAP = f"{HF}/pythia_deduped_pile_idxmaps/resolve/main/pile_0.87_deduped_text_document"
+DEDUP_PRESHUFFLED = f"{HF}/pile-deduped-pythia-preshuffled/resolve/main/document"
 PRESHUFFLED_SHARD_BYTES = 30_000_000_000
 SEQ_TOKENS = 2049
 SAMPLE_BYTES = SEQ_TOKENS * 2  # uint16 tokens
@@ -70,8 +72,8 @@ def _read_sharded(prefix: str, shard_bytes: int, n_shards: int, start: int, end:
 class TokenizedPile:
     """Remote reader for Pythia's unshuffled tokenized Pile (GPT-NeoX mmap format)."""
 
-    def __init__(self, prefix: str = IDXMAP):
-        self.prefix = prefix
+    def __init__(self, prefix: str = IDXMAP, n_shards: int = 132):
+        self.prefix, self.n_shards = prefix, n_shards
         head = _get(f"{prefix}.idx", 0, 34)
         assert head[:9] == b"MMIDIDX\x00\x00", "not a GPT-NeoX index file"
         self.n_docs = struct.unpack("<Q", head[18:26])[0]
@@ -89,7 +91,7 @@ class TokenizedPile:
         lo, hi = max(0, lo), min(self.n_docs, hi)
         sizes = self.sizes(lo, hi).astype(np.int64)
         p0 = int(self.pointers(lo, lo + 1)[0])
-        raw = _read_sharded(self.prefix, IDXMAP_SHARD_BYTES, 132, p0, p0 + 2 * int(sizes.sum()))
+        raw = _read_sharded(self.prefix, IDXMAP_SHARD_BYTES, self.n_shards, p0, p0 + 2 * int(sizes.sum()))
         starts = np.concatenate([[0], np.cumsum(sizes)[:-1]])
         return np.frombuffer(raw, dtype=np.uint16), starts
 
@@ -136,7 +138,22 @@ class TrainingOrder:
         return int(self.inverse[sample])
 
 
-def read_training_sample(position: int) -> np.ndarray:
+def read_training_sample(position: int, preshuffled: str = PRESHUFFLED) -> np.ndarray:
     """The 2,049 tokens Pythia trained on at training position `position` (batch = position // 1024)."""
-    raw = _read_sharded(PRESHUFFLED, PRESHUFFLED_SHARD_BYTES, 20, position * SAMPLE_BYTES, (position + 1) * SAMPLE_BYTES)
+    raw = _read_sharded(preshuffled, PRESHUFFLED_SHARD_BYTES, 20, position * SAMPLE_BYTES, (position + 1) * SAMPLE_BYTES)
     return np.frombuffer(raw, dtype=np.uint16)
+
+
+def reconstruct_sample(position: int, doc_idx, sample_idx, shuffle_idx, pile: TokenizedPile) -> np.ndarray:
+    """Rebuild the training sample at `position` from the unshuffled Pile and the index maps,
+    the way GPT-NeoX's dataset does: documents doc_idx[f..l], from offset f to offset l inclusive."""
+    s = int(shuffle_idx[position])
+    (jf, of), (jl, ol) = (int(v) for v in sample_idx[s]), (int(v) for v in sample_idx[s + 1])
+    parts = []
+    for j in range(jf, jl + 1):
+        d = int(doc_idx[j])
+        toks, _ = pile.window(d, d + 1)
+        lo = of if j == jf else 0
+        hi = ol + 1 if j == jl else len(toks)
+        parts.append(toks[lo:hi])
+    return np.concatenate(parts)
