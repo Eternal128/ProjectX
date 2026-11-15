@@ -1,61 +1,78 @@
 # Step mapping: Pile position to Pythia training step
 
-**Status: open (Phase 0, week 1). Owner: data lead.**
+**Status: resolved for standard Pythia (2026-11-15), verified on real items. Open for the
+deduplicated runs.** Code: `src/exposure/pile_order.py`, `src/exposure/date_items.py`.
 
-Infini-gram returns positions in the Pile, not Pythia training steps. This document
-records how we map a matched document or token span to the step where Pythia trained
-on it, and what that costs. Nothing below is verified yet; facts marked *(verify)*
-were written from memory.
+Infini-gram returns positions in the Pile, not Pythia training steps. This document records
+how we map a matched passage to the step where Pythia trained on it, what it costs, and how
+we checked it.
 
-## What the code assumes
+## Decision: option (b), map documents through GPT-NeoX's index maps
 
-`src/exposure/step_mapping.py` implements the arithmetic once a position in the
-**preshuffled training stream** is known:
+Every piece is published by EleutherAI, so no training data has to be downloaded in full.
 
-- Training stream is a sequence of fixed-length sequences of 2049 tokens *(verify)*.
-- Batch size is 1024 sequences, about 2M tokens per step *(verify)*.
-- 143,000 steps in total *(verify)*.
-- Batch `b` (0-based) is consumed by optimizer step `b + 1`, so checkpoint `stepN`
-  has seen batches `0 .. N-1`. **Verify this off-by-one** against the Pythia repo
-  before the first real run.
-- `t0 = first_batch + 1`; `E(t) = 1` iff `t >= t0`; `n(t)` = occurrences in batches `< t`.
+| Step | Source | What it gives |
+| --- | --- | --- |
+| 1. Find the passage | infini-gram, index `v4_piletrain_llama` (`find`, then `get_doc_by_rank`) | Pile document number, source file and line (e.g. `14.jsonl:1124868`) |
+| 2. Pin Pythia's document | `EleutherAI/pythia_pile_idxmaps` (Pythia's tokenized, unshuffled Pile), range reads | The same document in Pythia's numbering |
+| 3. Find its training samples | `EleutherAI/pile-preshuffled-seeds`, folder `seed0` (seed 1234): `doc_idx`, `sample_idx`, `shuffle_idx` | Which 2,049-token samples hold the document, and each sample's training position |
+| 4. Verify | `EleutherAI/pile-standard-pythia-preshuffled`, one 4,098-byte range read per sample | The passage's tokens really are in the batch Pythia trained on at that step |
 
-These values live in `configs/models.yaml` under `training`.
+Training position `i` is in batch `i // 1024`; batch `b` is consumed by optimizer step
+`b + 1` (`src/exposure/step_mapping.py`). Only samples that pass step 4 count.
 
-## Sources to check
+### Facts measured on the published files
 
-- Pythia preshuffled, pre-tokenized datasets on Hugging Face (standard and deduplicated
-  Pile) *(verify exact dataset names)*.
-- Batch tooling in the `EleutherAI/pythia` GitHub repo (batch viewer / memmap dataset
-  utilities) *(verify path and interface)*.
-- Infini-gram docs: Pile index name, what a `find` result returns (shard, suffix-array
-  rank, document index) *(verify)*.
+- **Tokenized Pile:** 210,604,984 documents (index header). Infini-gram's Pile train index
+  numbers its documents slightly differently: Pythia's number is lower by **1,339 at
+  document 99.4M and 2,572 at document 195.8M**, consistent with empty documents dropped
+  during tokenization. We therefore read a window of ±3,000 documents (17 to 20 MB) and
+  find the document that holds the passage's tokens. About 4 to 5 seconds per copy here.
+- **Index maps (seed 1234):** 2.79 GB in total (`doc_idx` 842 MB, `sample_idx` 1.30 GB,
+  `shuffle_idx` 649 MB). They describe one epoch of 162,165,686 samples. Pythia trained on
+  the first **146,432,000** training positions (143,000 steps × 1,024), so a document can
+  land after the end of training and is then never read.
+- **Preshuffled training file:** 601.8 GB per data version (20 shards of 30 GB plus
+  78 MB) = exactly 146,432,000 samples × 2,049 tokens × 2 bytes.
 
-## Options
+### Validation
 
-### (a) Search the preshuffled token files directly
+ARC-Easy item `MCAS_2003_8_17` ("Which of the following symbiotic relationships is
+considered parasitic?") has 2 copies in the Pile, both in Pile-CC. The method predicts
+the training samples for each, and reading those samples back from the preshuffled file
+finds the question's tokens in exactly one sample per copy:
 
-Tokenize candidate n-grams with the GPT-NeoX tokenizer and scan the preshuffled token
-files with a multi-pattern matcher (e.g. Aho-Corasick over token ids). Each hit's token
-offset maps directly to a batch.
+| Copy (infini-gram doc → Pythia doc) | Samples holding the document | Verified sample | Step |
+| --- | --- | --- | --- |
+| 195,793,549 → 195,790,977 | 4 | position 24,302,757 | **23,734** |
+| 99,410,851 → 99,409,512 | 4 (3 after training ends) | position 137,159,922 | **133,946** |
 
-- Storage: TBD (size of the preshuffled token files for each of standard / deduped).
-- Time: TBD (one or more full passes over ~300B tokens per data version).
-- Pros: gives every occurrence, so copy counts `n` come for free; no dependency on
-  document indices. Cons: heavy I/O; tokenization-boundary effects on matches.
+The neighbouring samples of the same documents do not contain the question, so the check
+is not passing by chance. First exposure `t0` for this item is step 23,734 (17% of
+training), and it was read again at step 133,946. `python -m exposure.date_items` runs
+the same check on every found pilot question.
 
-### (b) Map Pile document indices to the shuffled order
+## Option (a), scanning the training file, is not practical here
 
-If infini-gram returns Pile document indices and the Pythia tooling exposes the
-document-to-shuffled-sequence permutation, look up each matched document's position.
+Searching the 601.8 GB preshuffled file directly needs one full pass per data version.
+Downloads in our cloud container are capped at about **7 MB/s**, the same with 1 or 8
+parallel connections (measured on 500 MB and 8 × 200 MB range reads), so one pass would
+take about **24 hours** per version. On a machine with a 100 MB/s link it would take
+under 2 hours, and it would still be useful as an independent check of copy counts.
 
-- Storage: TBD. Time: TBD.
-- Pros: cheap per query. Cons: only works if the permutation is recoverable; documents
-  are packed and split across sequences, so the span offset inside the document matters;
-  infini-gram's Pile index may not share document order with Pythia's tokenized Pile.
+## Still open
 
-## Decision
-
-TBD. Record: chosen method, why, measured storage and time cost, and a validation check
-(e.g. for a handful of known matches, decode the batch at the computed step and confirm
-the text is there).
+- **Deduplicated runs.** `pile-preshuffled-seeds` holds index maps for the standard Pile
+  only. For `-deduped` models we need the deduplicated index maps: either rebuild them with
+  GPT-NeoX's `_build_index_mappings` (seed 1234) from `EleutherAI/pythia_deduped_pile_idxmaps`
+  and confirm with the same step-4 check against `pile-deduped-pythia-preshuffled`, or
+  scan that file directly (option a) on a fast machine.
+- **PolyPythias seeds (the seed check).** The same dataset has index maps for seeds 1 to 9
+  (`seed1` … `seed9`, 2.8 GB each). The code works unchanged with `TrainingOrder(maps_dir=…)`;
+  step 4 then needs the seed's own preshuffled data, or reading the sample's documents from
+  the unshuffled Pile instead.
+- **Off-by-one.** Whether batch `b` is first reflected in checkpoint `step b` or `step b+1`
+  is still unconfirmed. It shifts `t0` by one step, far below the checkpoint spacing.
+- **Copies split across two samples.** A passage cut by a sample boundary fails step 4 and
+  is not counted; such copies are rare (a 15-token question near a 2,049-token boundary)
+  and bias copy counts slightly down.
