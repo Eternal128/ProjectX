@@ -45,31 +45,38 @@ DOC_WINDOW = 3000  # infini-gram vs GPT-NeoX document numbering drift (empty doc
 # document; search a narrow window around the predicted drift first, the full window after
 DRIFT_PER_DOC = 1.32e-5
 NARROW_WINDOW = 300
-
-
-def find_neox_docs(pile: "TokenizedPile", ig_doc: int, needle: np.ndarray, ig_len: int | None = None) -> list[int]:
-    """Pythia's document numbers that hold `needle`, near infini-gram's document `ig_doc`.
-
-    With `ig_len` (infini-gram's length of the document, in its own tokens) only nearby
-    documents of a similar length are read first: Pile books run to hundreds of thousands of
-    tokens, so reading every document in the window would cost 100 MB or more."""
-    guess = ig_doc - int(round(ig_doc * DRIFT_PER_DOC))
-    if ig_len:
-        lo = max(0, guess - NARROW_WINDOW)
-        sizes = pile.sizes(lo, guess + NARROW_WINDOW)
-        near = np.flatnonzero((sizes >= 0.7 * ig_len) & (sizes <= 1.4 * ig_len))
-        for k in sorted(near.tolist(), key=lambda k: abs(lo + k - guess)):
-            toks, _ = pile.window(lo + k, lo + k + 1)
-            if find_subsequence(toks, needle):
-                return [lo + k]
-    for lo, hi in ((guess - NARROW_WINDOW, guess + NARROW_WINDOW), (ig_doc - DOC_WINDOW, ig_doc + DOC_WINDOW)):
-        lo = max(0, lo)
-        toks, starts = pile.window(lo, hi)
-        docs = sorted({lo + int(np.searchsorted(starts, h, side="right")) - 1 for h in find_subsequence(toks, needle)})
-        if docs:
-            return docs
-    return []
 MAPS = "pile_20B_tokenizer_text_document_train_0_indexmap_147164160ns_2048sl_1234s"
+
+
+def find_neox_docs(pile: "TokenizedPile", ig_doc: int, needle: np.ndarray, ig_len: int | None = None,
+                   budget_bytes: int = 64_000_000) -> list[int]:
+    """Pythia's document number that holds `needle`, near infini-gram's document `ig_doc`.
+
+    Documents are read one at a time, nearest to the predicted number first: documents of a
+    similar length to infini-gram's (`ig_len`, its own tokens) first, then any document in
+    +-NARROW_WINDOW, then in +-DOC_WINDOW, until `budget_bytes` have been read. Pile books run to
+    hundreds of thousands of tokens, so reading whole windows at once can cost hundreds of MB."""
+    guess = ig_doc - int(round(ig_doc * DRIFT_PER_DOC))
+    seen: set[int] = set()
+    spent = 0
+    for half in (NARROW_WINDOW, DOC_WINDOW):
+        lo = max(0, guess - half)
+        sizes = pile.sizes(lo, min(pile.n_docs, guess + half)).astype(np.int64)
+        order = sorted(range(len(sizes)), key=lambda k: abs(lo + k - guess))
+        if ig_len:  # likely matches first, by length
+            order = [k for k in order if 0.7 * ig_len <= sizes[k] <= 1.4 * ig_len] + order
+        for k in order:
+            doc = lo + k
+            if doc in seen:
+                continue
+            seen.add(doc)
+            if spent + 2 * sizes[k] > budget_bytes:
+                return []
+            spent += 2 * int(sizes[k])
+            toks, _ = pile.window(doc, doc + 1)
+            if find_subsequence(toks, needle):
+                return [doc]
+    return []
 
 
 def _get(url: str, start: int, end: int) -> bytes:
