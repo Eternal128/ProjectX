@@ -45,8 +45,14 @@ class InfiniGramClient:
         wait = self.min_interval - (time.monotonic() - self._last)
         if wait > 0:
             time.sleep(wait)
-        resp = requests.post(self.api_url, json=payload, timeout=60)
-        self._last = time.monotonic()
+        for attempt in range(8):
+            resp = requests.post(self.api_url, json=payload, timeout=60)
+            self._last = time.monotonic()
+            if resp.status_code not in (429, 500, 502, 503, 504):
+                break
+            # rate-limited or a passing server error: back off and retry
+            retry_after = resp.headers.get("Retry-After", "")
+            time.sleep(float(retry_after) if retry_after.isdigit() else min(120.0, 5.0 * 2 ** attempt))
         resp.raise_for_status()
         out = resp.json()
         if "error" in out:

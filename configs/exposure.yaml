@@ -7,7 +7,7 @@ infini_gram:
   # VERIFY against the infini-gram docs: index name for the full Pile train set.
   index: v4_piletrain_llama
   cache_dir: data/exposure/infini_gram_cache
-  max_requests_per_second: 5
+  max_requests_per_second: 2   # the public API rate-limits (429) at sustained higher rates
 
 retrieval:
   long_ngram_tokens: 13      # long exact-match n-grams (question and answer)
