@@ -21,10 +21,22 @@ Run 2026-11-15 on branch `james/pilot-results` (4 CPU cores, no GPU).
 
 ### 1. Our scoring reproduces EleutherAI's published accuracy
 
-At every checkpoint scored, our accuracy on the full test sets matches the published numbers to
-within about one point (SciQ at steps 512 / 1000 / 3000: 23.4 / 40.3 / 70.4% vs published
-23.4 / 40.4 / 70.3%). LAMBADA on the 500-passage sample: 51.8% at step 143000 vs 51.6% published on
-all 5,153. The full per-checkpoint table is in `site/data/pilot.json` (`accuracy`) and on the website.
+| Test | Checkpoints scored | Largest gap to the published accuracy |
+| --- | --- | --- |
+| SciQ (1,000) | 6 (512 to 53000) | 0.4 points |
+| ARC-Easy (2,376) | 6 (512 to 53000) | 0.1 points |
+| PIQA (1,838) | 6 (512 to 53000) | 0.2 points |
+| LAMBADA (500-passage sample) | all 10 | 2.0 points (sampling: published is on all 5,153) |
+
+The per-checkpoint table is in `site/data/pilot.json` (`accuracy`) and on the website. The last 4
+checkpoints of SciQ / ARC-Easy / PIQA (73000 to 143000) were not reached: the scoring run is
+capped at 2 hours per background job in this cloud session. To finish (about 2.5 hours on 4
+cores; it resumes and skips the 6 done):
+
+```bash
+cd src && python -m evals.score_cpu --steps 512 1000 3000 13000 33000 53000 73000 93000 113000 143000
+python -m figures.site_pilot
+```
 
 ### 2. Almost none of the SciQ, ARC-Easy and PIQA questions are in the Pile; a quarter of LAMBADA is
 
