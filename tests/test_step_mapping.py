@@ -73,3 +73,45 @@ def test_samples_of_doc_cover_every_token_of_the_document():
 def test_training_position_inverts_the_shuffle():
     o = _toy_order()
     assert [o.training_position(s) for s in range(4)] == [1, 3, 2, 0]
+
+
+def _neox_sample_idx_reference(sizes, doc_idx, seq_length, num_epochs, tokens_per_epoch):
+    """Line-by-line port of GPT-NeoX's C++ build_sample_idx."""
+    import numpy as np
+
+    num_samples = (num_epochs * tokens_per_epoch - 1) // seq_length
+    out = np.zeros((num_samples + 1, 2), dtype=np.int32)
+    doc_idx_index, doc_offset = 0, 0
+    for k in range(1, num_samples + 1):
+        remaining = seq_length + 1
+        while remaining != 0:
+            doc_length = sizes[doc_idx[doc_idx_index]] - doc_offset
+            remaining -= doc_length
+            if remaining <= 0:
+                doc_offset += remaining + doc_length - 1
+                remaining = 0
+            else:
+                doc_idx_index += 1
+                doc_offset = 0
+        out[k] = (doc_idx_index, doc_offset)
+    return out
+
+
+def test_rebuilt_index_maps_match_the_neox_recipe():
+    import numpy as np
+    from exposure.index_maps import build, num_epochs
+
+    rng = np.random.default_rng(0)
+    sizes = rng.integers(1, 40, size=300).astype(np.int32)
+    seq, want = 16, 500  # more samples than one epoch holds, so two epochs are needed
+    doc_idx, sample_idx, shuffle_idx = build(sizes, num_samples=want, seq_length=seq, seed=1234)
+    e = num_epochs(int(sizes.sum()), seq, want)
+    assert e == 2 and len(doc_idx) == 2 * len(sizes) and np.bincount(doc_idx).tolist() == [2] * len(sizes)
+    ref_rng = np.random.RandomState(1234)
+    ref_doc = np.tile(np.arange(len(sizes), dtype=np.int32), e)
+    ref_rng.shuffle(ref_doc)
+    assert np.array_equal(doc_idx, ref_doc)
+    assert np.array_equal(sample_idx, _neox_sample_idx_reference(sizes, ref_doc, seq, e, int(sizes.sum())))
+    ref_shuffle = np.arange(len(sample_idx) - 1, dtype=np.uint32)
+    ref_rng.shuffle(ref_shuffle)
+    assert np.array_equal(shuffle_idx, ref_shuffle)

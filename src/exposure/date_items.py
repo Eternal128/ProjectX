@@ -81,10 +81,11 @@ def main(argv=None) -> None:
                     ok = trained and bool(find_subsequence(read_training_sample(pos), needle))
                     rows.append({**base, "neox_doc": doc, "sample": sample, "position": pos,
                                  "step": pos // BATCH + 1 if trained else -1, "verified": ok})
-        print(f"{r.benchmark} {r.item_id}: {len(ranks)} copies, "
-              f"{sum(x['verified'] for x in rows if x['item_id'] == r.item_id)} verified training samples", flush=True)
+        n_ok = len({x["position"] for x in rows if x["item_id"] == r.item_id and x["verified"]})
+        print(f"{r.benchmark} {r.item_id}: {len(ranks)} copies, {n_ok} verified training samples", flush=True)
 
-    dates = pd.DataFrame(rows)
+    # two infini-gram copies in one document lead to the same training samples: count each sample once
+    dates = pd.DataFrame(rows).drop_duplicates(["benchmark", "item_id", "neox_doc", "sample"]).reset_index(drop=True)
     prov = provenance({"max_copies": args.max_copies, "doc_window": DOC_WINDOW}, args.config)
     write_parquet(dates, "data/exposure/pilot_dates.parquet", prov)
 
