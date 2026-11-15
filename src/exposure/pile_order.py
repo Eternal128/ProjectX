@@ -133,8 +133,10 @@ class TrainingOrder:
         self.doc_idx = np.load(d / f"{MAPS}_doc_idx.npy", mmap_mode="r")
         self.sample_idx = np.load(d / f"{MAPS}_sample_idx.npy", mmap_mode="r")
         shuffle = np.load(d / f"{MAPS}_shuffle_idx.npy")
-        self.inverse = np.empty(len(shuffle), dtype=np.int64)
-        self.inverse[shuffle] = np.arange(len(shuffle), dtype=np.int64)
+        # int32 is enough (162M samples, 210M documents) and halves memory next to the scoring runs
+        self.inverse = np.empty(len(shuffle), dtype=np.int32)
+        self.inverse[shuffle] = np.arange(len(shuffle), dtype=np.int32)
+        del shuffle
         self._sample_doc = np.asarray(self.sample_idx[:, 0])
 
     @property
@@ -144,8 +146,8 @@ class TrainingOrder:
         if not hasattr(self, "_pos_cache"):
             d = np.asarray(self.doc_idx)
             if len(d) == d.max() + 1:
-                inv = np.empty(len(d), dtype=np.int64)
-                inv[d] = np.arange(len(d), dtype=np.int64)
+                inv = np.empty(len(d), dtype=np.int32)
+                inv[d] = np.arange(len(d), dtype=np.int32)
                 self._pos_cache = inv
             else:
                 self._pos_cache = None
