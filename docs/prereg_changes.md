@@ -10,15 +10,36 @@ valid result.
 | Date | What changed | Old | New | Reason | Who |
 | --- | --- | --- | --- | --- | --- |
 | 2026-11-04 | Initial provisional thresholds committed in `configs/` (no data seen) | — | see `configs/exposure.yaml`, `configs/event_study.yaml`, `configs/benchmarks.yaml` | Repository setup. To be fixed on the development split before any main-split result. | repo setup |
+| 2026-11-15 | infini-gram request rate in `configs/exposure.yaml` | 5 per second | 2 per second, with back-off | The public API rate-limited (429) after about 2,000 queries. Operational only; no threshold or result affected. | pilot run |
 
 ## Phase 0 go / no-go decision
 
-To be filled in at the end of week 1 (AGENTS.md, Phase 0 step 4).
+To be decided by the team at the end of week 1 (AGENTS.md, Phase 0 step 4). Evidence from the
+CPU pilot (2026-11-15, Pythia 410M standard; `docs/pilot.md`, `docs/step_mapping.md`):
 
-- Confirmed exposed items passing the timing filter: **TBD**
+| Benchmark | Confirmed items found | Dated to a training step | Pass the timing filter |
+| --- | --- | --- | --- |
+| SciQ, ARC-Easy, PIQA (all 5,214) | 2 (question and answer); 14 with the question alone | 14 of 14 | 2 confirmed; 11 of the 14 |
+| LAMBADA (seeded sample of 500 of 5,153) | 117 (last 13 words, ending in the answer word) | 114 of 117 | **94** |
+
+- Confirmed exposed items passing the timing filter: **about 969 for LAMBADA** (94 of 500 sampled,
+  18.8%, 95% Wilson interval 15.6 to 22.5%, scaled to 5,153 passages: 805 to 1,157), plus 2
+  from SciQ / ARC-Easy / PIQA. Measured for the standard 410M run; the timing filter uses the
+  30 study checkpoints in `configs/models.yaml`.
 - Threshold: 200 (`configs/exposure.yaml: go_no_go.min_confirmed_after_timing_filter`)
-- Decision: **TBD** (if below 200: move the `likely` tier into the main analysis and drop
-  the ability interaction term `delta_2`)
+- What the rule implies: the count is above 200, so the pre-registered fallback (move the
+  `likely` tier in, drop `delta_2`) is **not** triggered. Nearly all exposed items come from
+  LAMBADA, so the event study and the exposure IRT model would in practice be LAMBADA analyses;
+  SciQ, ARC-Easy and PIQA serve mostly as clean comparison items.
+- Things the team should weigh before deciding:
+  - The count is a sample estimate; dating all 5,153 passages takes about 2 hours on this CPU
+    and should be done before the main analysis.
+  - Copies per item are few (1 to 5, mostly 1 or 2; 184 of 198 copies confirmed in a training
+    batch), so H3's dose term `delta_1` will be estimated from a narrow range.
+  - The deduplicated runs are not yet countable (`docs/step_mapping.md`, still open).
+  - Copies are almost all in BookCorpus2 and Books3, so exposure is confounded with "comes from a
+    book in the Pile"; matched clean items should be drawn from LAMBADA passages too.
+- Decision: **TBD (team)**. Nothing in the hypotheses or thresholds has been changed.
 
 ## Benchmark above-chance check
 
@@ -28,7 +49,7 @@ To be filled in during week 1 (AGENTS.md, Phase 0 step 2). One row per candidate
 | --- | --- | --- | --- |
 | TriviaQA | 0 | TBD (not in published results) | TBD |
 | SQuAD | 0 | TBD (not in published results) | TBD |
-| LAMBADA | 0 | 0.516 (published) | keep, provisional |
+| LAMBADA | 0 | 0.516 (published); 0.518 ours on the 500-passage sample | keep, provisional |
 | ARC-Easy | 0.25 | 0.521 (published) | keep, provisional |
 | SciQ | 0.25 | 0.811 (published) | keep, provisional |
 | PIQA | 0.5 | 0.668 (published) | keep, provisional |
