@@ -23,6 +23,7 @@ from __future__ import annotations
 import argparse
 import shutil
 import subprocess
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -42,13 +43,25 @@ def maps_name(seed: int) -> str:
 
 
 def fetch_maps(seed: int):
+    """Download a run's three map files, resuming any partial file until it has the size the
+    Hub lists (an interrupted transfer otherwise leaves a short file behind)."""
+    import json
+    import urllib.request
+
     d = STEP_DIR / f"seed{seed}"
     d.mkdir(parents=True, exist_ok=True)
+    api = f"https://huggingface.co/api/datasets/EleutherAI/pile-preshuffled-seeds/tree/main/seed{seed}"
+    with urllib.request.urlopen(api, timeout=60) as r:
+        sizes = {Path(x["path"]).name: int(x["size"]) for x in json.load(r)}
     for kind in ("doc_idx", "sample_idx", "shuffle_idx"):
         f = d / f"{maps_name(seed)}_{kind}.npy"
-        if not f.exists() or f.stat().st_size == 0:
+        for _ in range(5):
+            if f.exists() and f.stat().st_size == sizes[f.name]:
+                break
             subprocess.run(["curl", "-sS", "-L", "--retry", "5", "-C", "-", "-o", str(f),
-                            f"{SEED_URL}/seed{seed}/{f.name}"], check=True)
+                            f"{SEED_URL}/seed{seed}/{f.name}"], check=False)
+        if not f.exists() or f.stat().st_size != sizes[f.name]:
+            raise RuntimeError(f"could not download {f.name}")
     return d
 
 
