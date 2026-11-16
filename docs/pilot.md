@@ -58,7 +58,9 @@ is a lower bound and missed copies push any effect toward zero.
 All 14 found SciQ / ARC-Easy / PIQA questions were dated: 27 of their 32 Pile copies were confirmed
 inside the exact training batch Pythia read (the other 5 fall after training ends or across a sample
 boundary). First reads range from step 7,917 to step 132,700. Example: ARC-Easy `MCAS_2003_8_17`
-was read at step 23,734 and again at step 133,946. LAMBADA dating: see `docs/prereg_changes.md`.
+was read at step 23,734 and again at step 133,946. LAMBADA: all 5,153 passages searched, 1,169 found (22.7%, 95% CI 21.6 to 23.9%); of the first
+474 dated, 364 pass the pre-registered timing filter, above the go / no-go threshold of 200
+(`docs/prereg_changes.md`).
 
 ### 4. Found LAMBADA passages are not answered better (descriptive)
 

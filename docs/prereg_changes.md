@@ -26,14 +26,19 @@ CPU pilot (2026-11-15, Pythia 410M standard; `docs/pilot.md`, `docs/step_mapping
   18.8%, 95% Wilson interval 15.6 to 22.5%, scaled to 5,153 passages: 805 to 1,157), plus 2
   from SciQ / ARC-Easy / PIQA. Measured for the standard 410M run; the timing filter uses the
   30 study checkpoints in `configs/models.yaml`.
+- **Counted directly (2026-11-16):** all 5,153 LAMBADA passages searched; **1,169** (22.7%,
+  95% CI 21.6 to 23.9%) have their last 13 words in the Pile. Dating stopped at the session's
+  2-hour job limit after 474 of the 1,169: 449 dated, **364 pass the timing filter**, already
+  above 200. At that rate all 1,169 would give about 900, in line with the sample estimate.
+  To finish: `python -m exposure.date_items --source lambada_all --workers 6` (resumes).
 - Threshold: 200 (`configs/exposure.yaml: go_no_go.min_confirmed_after_timing_filter`)
 - What the rule implies: the count is above 200, so the pre-registered fallback (move the
   `likely` tier in, drop `delta_2`) is **not** triggered. Nearly all exposed items come from
   LAMBADA, so the event study and the exposure IRT model would in practice be LAMBADA analyses;
   SciQ, ARC-Easy and PIQA serve mostly as clean comparison items.
 - Things the team should weigh before deciding:
-  - The count is a sample estimate; dating all 5,153 passages takes about 2 hours on this CPU
-    and should be done before the main analysis.
+  - 364 is a direct count on 40% of the found passages; finishing the other 695 takes about
+    4 hours of mostly network time.
   - Copies per item are few (1 to 5, mostly 1 or 2; 184 of 198 copies confirmed in a training
     batch), so H3's dose term `delta_1` will be estimated from a narrow range.
   - The deduplicated runs are not yet countable (`docs/step_mapping.md`, still open).

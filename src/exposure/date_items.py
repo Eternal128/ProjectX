@@ -80,6 +80,8 @@ def main(argv=None) -> None:
                          "coverage probe's sample; lambada_all: every LAMBADA passage found (probe_coverage --lambada-all)")
     ap.add_argument("--max-copies", type=int, default=50)
     ap.add_argument("--workers", type=int, default=4)
+    ap.add_argument("--finished-only", action="store_true",
+                    help="date nothing new: summarise only the items already in the part file (a stopped run)")
     args = ap.parse_args(argv)
     from transformers import AutoTokenizer
 
@@ -134,6 +136,9 @@ def main(argv=None) -> None:
 
     from concurrent.futures import ThreadPoolExecutor
 
+    if args.finished_only:
+        todo = [t for t in todo if (t["benchmark"], t["item_id"]) in done]
+        print(f"summarising {len(todo)} finished items", flush=True)
     with ThreadPoolExecutor(max_workers=args.workers) as pool:  # network-bound: overlap the waits
         rows = [r for out in pool.map(date_one, todo) for r in out]
 
