@@ -145,6 +145,7 @@
             <h3>We can tell when it read them</h3>
             <p>Pythia’s makers published the exact order it read everything in. Using it, we find the training step at which each found question was read, then open that step’s batch of text to check the question is really there.</p>
             <p>For example, the ARC-Easy question “Which of the following symbiotic relationships is considered parasitic?” was read at <b>step 23,734</b> and again at step 133,946. Each dot is the first time one item was read.</p>
+            <p>Pythia was also retrained 9 more times, each reading the same text in a different order. The same passage is read at very different times in different runs: typically <b>more than 100,000 steps apart</b>. That lets us compare a passage with itself, read early in one run and late in another.</p>
           </div>
         </article>
       </div>

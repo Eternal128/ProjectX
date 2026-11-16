@@ -41,6 +41,21 @@ CPU pilot (2026-11-15, Pythia 410M standard; `docs/pilot.md`, `docs/step_mapping
     book in the Pile"; matched clean items should be drawn from LAMBADA passages too.
 - Decision: **TBD (team)**. Nothing in the hypotheses or thresholds has been changed.
 
+## Proposed additions (to decide and log before the week-2 freeze)
+
+Two additions came out of the team discussion on 2026-11-07. Neither is pre-registered yet;
+if adopted, each needs a hypothesis and threshold written here before any result it affects
+is looked at.
+
+1. **Seed check.** Compare each exposed passage with itself across the 10 Pythia training runs
+   (the original plus 9 PolyPythias reruns, sizes up to 410M), which read it at different
+   steps. Feasibility (2026-11-15, `docs/step_mapping.md`): all 128 found pilot items are
+   dated in every run; median spread of first-read step 112,925 steps; 80% of LAMBADA
+   first-read variance is within passage.
+2. **Planted-question test.** Continue training a small Pythia from a mid-training checkpoint
+   with chosen questions inserted at known steps and copy counts, and check the event study
+   recovers the planted effect and estimate how much missed copies shrink it. Not started.
+
 ## Benchmark above-chance check
 
 To be filled in during week 1 (AGENTS.md, Phase 0 step 2). One row per candidate.
