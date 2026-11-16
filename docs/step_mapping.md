@@ -79,6 +79,33 @@ rebuilds them from per-document token counts with GPT-NeoX's recipe (seed 1234).
   146,431,999. The maps take 3.5 GB and rebuild in about a minute
   (`python -m exposure.index_maps --deduped`), so they are not stored.
 
+## The 9 other training runs (PolyPythias, the seed check)
+
+`EleutherAI/pile-preshuffled-seeds` also publishes the index maps of the 9 PolyPythias
+reruns (`seed1` … `seed9`, 2.8 GB each). Document numbers are shared, so once a copy's place
+in the Pile is known (document and token offset), its training step in any run is index
+arithmetic (`python -m exposure.seed_dates`; maps downloaded and deleted one run at a time).
+
+- **Check:** for the original run the arithmetic puts 208 of 211 copies at exactly the
+  training position confirmed by reading Pythia's batches (the other 3 are documents that
+  hold the passage twice).
+- **seed2's published shuffle file is broken.** 149,810,208 of its 162,165,686 entries are
+  0, so it is not a permutation and every item looked first-read at step 1. Rebuilding the
+  seed-2 maps with `exposure.index_maps` gives a permutation that agrees with **all
+  12,355,478** surviving entries, so the rebuild is used. `seed_dates` checks every run's
+  shuffle this way; seeds 0, 1 and 3 to 9 are valid as published.
+- **Result (128 dated items: 14 pilot questions and 114 LAMBADA passages from the sample):**
+  each run reads 119 to 128 of them within training (about 10% of each run's shuffled
+  order falls after step 143,000, as expected). The same item is first read at very
+  different steps in different runs: median spread across runs 112,925 steps (IQR 97,180
+  to 126,937); 80% of the variance in first-read step for LAMBADA passages is within
+  passage, across runs; runs 0 and 1 correlate at 0.16. In each run 77 to 94 of the 114
+  LAMBADA passages pass the timing filter, and 112 pass it in at least 5 of the 10 runs.
+
+So the seed check has what it needs: the same passage read early in some runs and late in
+others, which compares a passage with itself instead of with other passages.
+PolyPythias runs exist for sizes up to 410M only.
+
 ## Still open
 
 - **Finding a passage's document in the deduplicated Pile.** Infini-gram indexes the
@@ -91,9 +118,6 @@ rebuilds them from per-document token counts with GPT-NeoX's recipe (seed 1234).
   the deduplicated training file directly for the matched tokens (option a) on a machine
   with a fast link. The dedup comparison is a secondary check (AGENTS.md), so this does
   not block the main analysis.
-- **PolyPythias seeds (the seed check).** The same dataset has index maps for seeds 1 to 9
-  (`seed1` … `seed9`, 2.8 GB each). The code works unchanged with `TrainingOrder(maps_dir=…)`,
-  and `reconstruct_sample` verifies a sample without the seed's own preshuffled data.
 - **Off-by-one.** Whether batch `b` is first reflected in checkpoint `step b` or `step b+1`
   is still unconfirmed. It shifts `t0` by one step, far below the checkpoint spacing.
 - **Copies split across two samples.** A passage cut by a sample boundary fails the check

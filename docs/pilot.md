@@ -75,6 +75,15 @@ checkpoint. This compares different passages, so it is not a causal estimate: fo
 be harder, and many were read late. The event study (each passage before vs after its own first
 read, against matched clean passages) is what separates these, and it is the next step.
 
+### 5. The same passage is read at very different times in different training runs
+
+EleutherAI's 9 PolyPythias reruns read the same text in other orders. Dating the 128 found
+items in all 10 runs (`exposure.seed_dates`; details in `docs/step_mapping.md`) shows a median
+spread of 112,925 steps in when an item is first read, with 80% of the variation in first-read
+step lying within a passage, across runs. This is the variation the seed check needs: one
+passage, read early in some runs and late in others. One published index file (seed 2) was
+broken and has been rebuilt and checked against every surviving entry.
+
 ## What it cannot show
 
 The pilot compares groups of items; it does not estimate what reading an item did to the model.
