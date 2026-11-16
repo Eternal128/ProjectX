@@ -83,12 +83,19 @@ def _get(url: str, start: int, end: int) -> bytes:
     """Bytes [start, end) of a remote file."""
     import requests
 
-    for attempt in range(6):
-        r = requests.get(url, headers={"Range": f"bytes={start}-{end - 1}"}, timeout=120)
+    import time
+
+    for attempt in range(8):
+        try:
+            r = requests.get(url, headers={"Range": f"bytes={start}-{end - 1}"}, timeout=120)
+        except (requests.ConnectionError, requests.Timeout):  # dropped or reset connection: retry
+            time.sleep(min(60, 2 ** attempt))
+            continue
         if r.status_code == 206 and len(r.content) == end - start:
             return r.content
         if r.status_code not in (429, 500, 502, 503, 504):
             r.raise_for_status()
+        time.sleep(min(60, 2 ** attempt))
     raise RuntimeError(f"range read failed: {url} {start}-{end}")
 
 
