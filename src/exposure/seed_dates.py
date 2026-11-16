@@ -52,6 +52,25 @@ def fetch_maps(seed: int):
     return d
 
 
+def check_or_repair_shuffle(seed: int, d) -> str:
+    """The published shuffle must be a permutation. If it is not (seed 2's file is mostly
+    zeros), rebuild it with GPT-NeoX's recipe (exposure.index_maps) and accept the rebuild
+    only if it agrees with every surviving non-zero entry of the published file."""
+    f = d / f"{maps_name(seed)}_shuffle_idx.npy"
+    pub = np.load(f, mmap_mode="r")
+    if (np.bincount(np.asarray(pub), minlength=len(pub)) == 1).all():
+        return "published file is a permutation"
+    from exposure.index_maps import build
+
+    _, _, rebuilt = build(np.load(STEP_DIR / "standard_sizes.npy"), num_samples=147_164_160, seed=seed)
+    ok = np.asarray(pub) != 0
+    agree = int((np.asarray(pub)[ok] == rebuilt[ok]).sum())
+    if agree != int(ok.sum()):
+        raise RuntimeError(f"seed {seed}: rebuilt shuffle disagrees with {int(ok.sum()) - agree} published entries")
+    np.save(f, rebuilt)
+    return f"published file broken ({int((~ok).sum()):,} zero entries); rebuilt, agrees with all {agree:,} others"
+
+
 def sample_holding(order: TrainingOrder, doc: int, offset: int) -> int | None:
     """The unshuffled sample whose span starts at or before (doc position, offset), last such."""
     best = None
@@ -98,7 +117,9 @@ def main(argv=None) -> None:
             rows += pd.read_parquet(part).to_dict("records")
             print(f"seed {seed}: already done", flush=True)
             continue
-        order = TrainingOrder(fetch_maps(seed) if seed else STEP_DIR / "seed0", name=maps_name(seed))
+        maps_dir = fetch_maps(seed) if seed else STEP_DIR / "seed0"
+        print(f"seed {seed}: {check_or_repair_shuffle(seed, maps_dir)}", flush=True)
+        order = TrainingOrder(maps_dir, name=maps_name(seed))
         for c in copies.itertuples():
             s = sample_holding(order, c.neox_doc, c.offset)
             pos = order.training_position(s) if s is not None else -1
