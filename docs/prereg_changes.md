@@ -22,23 +22,21 @@ CPU pilot (2026-11-15, Pythia 410M standard; `docs/pilot.md`, `docs/step_mapping
 | SciQ, ARC-Easy, PIQA (all 5,214) | 2 (question and answer); 14 with the question alone | 14 of 14 | 2 confirmed; 11 of the 14 |
 | LAMBADA (seeded sample of 500 of 5,153) | 117 (last 13 words, ending in the answer word) | 114 of 117 | **94** |
 
-- Confirmed exposed items passing the timing filter: **about 969 for LAMBADA** (94 of 500 sampled,
-  18.8%, 95% Wilson interval 15.6 to 22.5%, scaled to 5,153 passages: 805 to 1,157), plus 2
-  from SciQ / ARC-Easy / PIQA. Measured for the standard 410M run; the timing filter uses the
-  30 study checkpoints in `configs/models.yaml`.
-- **Counted directly (2026-11-16):** all 5,153 LAMBADA passages searched; **1,169** (22.7%,
-  95% CI 21.6 to 23.9%) have their last 13 words in the Pile. Dating stopped at the session's
-  2-hour job limit after 474 of the 1,169: 449 dated, **364 pass the timing filter**, already
-  above 200. At that rate all 1,169 would give about 900, in line with the sample estimate.
-  To finish: `python -m exposure.date_items --source lambada_all --workers 6` (resumes).
+- Confirmed exposed items passing the timing filter: **877 for LAMBADA, counted**, plus 2 from
+  SciQ / ARC-Easy / PIQA. The 500-passage sample had estimated about 969 (94 of 500, 95% Wilson
+  interval 805 to 1,157 when scaled to 5,153 passages). Measured for the standard 410M run; the
+  timing filter uses the 30 study checkpoints in `configs/models.yaml`.
+- **Counted directly, complete (2026-11-17):** all 5,153 LAMBADA passages searched; **1,169**
+  (22.7%, 95% CI 21.6 to 23.9%) have their last 13 words in the Pile; 1,107 are dated to a
+  training step (1,736 of 1,902 copies confirmed inside a training batch); **877 pass the timing
+  filter** (17.0% of LAMBADA, 95% CI 16.0 to 18.1%). 168 were first read in the first 10% of
+  training and 62 in the last 10%. Copies per passage: 1 to 14, mostly 1 (608) or 2 (439).
 - Threshold: 200 (`configs/exposure.yaml: go_no_go.min_confirmed_after_timing_filter`)
 - What the rule implies: the count is above 200, so the pre-registered fallback (move the
   `likely` tier in, drop `delta_2`) is **not** triggered. Nearly all exposed items come from
   LAMBADA, so the event study and the exposure IRT model would in practice be LAMBADA analyses;
   SciQ, ARC-Easy and PIQA serve mostly as clean comparison items.
 - Things the team should weigh before deciding:
-  - 364 is a direct count on 40% of the found passages; finishing the other 695 takes about
-    4 hours of mostly network time.
   - Copies per item are few (1 to 5, mostly 1 or 2; 184 of 198 copies confirmed in a training
     batch), so H3's dose term `delta_1` will be estimated from a narrow range.
   - The deduplicated runs are not yet countable (`docs/step_mapping.md`, still open).

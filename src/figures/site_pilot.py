@@ -104,11 +104,12 @@ def main(argv=None) -> None:
             it = items[(r.benchmark, r.item_id)]
             out["examples"].append({"benchmark": r.benchmark, "question": it["question"], "answer": it["answer_text"],
                                     "copies": int(r.qa_count)})
-    for source in ("pilot", "lambada"):
+    lam_src = "lambada_all" if (REPO_ROOT / "data" / "exposure" / "lambada_all_first_exposure.parquet").exists() else "lambada"
+    for source in ("pilot", lam_src):
         fe = REPO_ROOT / "data" / "exposure" / f"{source}_first_exposure.parquet"
         if fe.exists():
             f = pd.read_parquet(fe)
-            out.setdefault("dates", {})[source] = {
+            out.setdefault("dates", {})["lambada" if source == "lambada_all" else source] = {
                 "items": int(len(f)), "dated": int(f["t0"].notna().sum()), "pass_timing": int(f["passes_timing"].sum()) if "passes_timing" in f else None,
                 "t0": sorted(int(t) for t in f["t0"].dropna()),
             }
