@@ -356,17 +356,33 @@ function drawDates(P) {
   const box = document.getElementById('dates-chart');
   if (!box || !P.dates) return;
   const sets = Object.entries(P.dates).filter(([, d]) => d.t0.length);
-  const H = 44 + sets.length * 46;
+  const H = 44 + sets.reduce((a, [, d]) => a + (d.t0.length > 60 ? 70 : 46), 0);
   const { svg, w } = frame(box, H);
   const m = { l: w < 480 ? 92 : 120, r: 20 };
   const x = linear(0, DESIGN.total, m.l, w - m.r);
   svg.append(el('rect', { x: x(DESIGN.filter.lo * DESIGN.total), y: 8, width: x(DESIGN.filter.hi * DESIGN.total) - x(DESIGN.filter.lo * DESIGN.total), height: H - 40, rx: 6, fill: '#e9f8ef' }));
   svg.append(el('text', { x: x(0.5 * DESIGN.total), y: 22, 'text-anchor': 'middle' }, 'usable for the main study if first read in here'));
-  sets.forEach(([key, d], i) => {
-    const y = 48 + i * 46;
+  let yAt = 48;
+  sets.forEach(([key, d]) => {
+    if (d.t0.length > 60) yAt += 24;
+    const y = yAt;
+    yAt += 46;
     svg.append(el('text', { x: m.l - 10, y: y + 4, 'text-anchor': 'end', class: 't-ink' }, key === 'pilot' ? 'SciQ, ARC, PIQA' : 'LAMBADA'));
     svg.append(el('line', { x1: m.l, x2: w - m.r, y1: y, y2: y, stroke: 'var(--grid)' }));
-    for (const t of d.t0) svg.append(el('circle', { cx: x(t), cy: y, r: 4.5, fill: key === 'pilot' ? 'var(--series-2)' : 'var(--series-1)', 'fill-opacity': 0.7, stroke: 'var(--bg)', 'stroke-width': 1 }));
+    const color = key === 'pilot' ? 'var(--series-2)' : 'var(--series-1)';
+    if (d.t0.length <= 60) {
+      for (const t of d.t0) svg.append(el('circle', { cx: x(t), cy: y, r: 4.5, fill: color, 'fill-opacity': 0.7, stroke: 'var(--bg)', 'stroke-width': 1 }));
+    } else {
+      // many items: a histogram of first reads (bins of about 3,600 steps), bars rising from the row line
+      const nb = 40, bw = DESIGN.total / nb, counts = new Array(nb).fill(0);
+      for (const t of d.t0) counts[Math.min(nb - 1, Math.floor(t / bw))] += 1;
+      const top = Math.max(...counts);
+      counts.forEach((c, b) => {
+        const hgt = (c / top) * 30;
+        if (c) svg.append(el('rect', { x: x(b * bw) + 0.5, y: y - hgt, width: Math.max(1, x((b + 1) * bw) - x(b * bw) - 1), height: hgt, fill: color, 'fill-opacity': 0.75 }));
+      });
+      svg.append(el('text', { x: w - m.r, y: y - 34, 'text-anchor': 'end' }, `${fmt(d.t0.length)} items`));
+    }
   });
   for (const s of (w < 560 ? [0, 71500, 143000] : [0, 35750, 71500, 107250, 143000])) svg.append(el('text', { x: x(s), y: H - 8, 'text-anchor': s === 0 ? 'start' : s === 143000 ? 'end' : 'middle' }, s === 143000 ? '143k steps' : stepLabel(s)));
   srTable(box, ['Test', 'Items dated', 'First-read steps'], sets.map(([k, d]) => [k === 'pilot' ? 'SciQ, ARC-Easy, PIQA' : 'LAMBADA', fmt(d.dated), d.t0.map(fmt).join(', ')]), 'Training step at which Pythia first read each found item');
