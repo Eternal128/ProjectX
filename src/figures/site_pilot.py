@@ -40,6 +40,33 @@ def boot_ci(x: np.ndarray, reps: int = 1000, seed: int = 0) -> tuple[float, floa
     return float(lo), float(hi)
 
 
+def slips(n: int = 3) -> list[dict]:
+    """Real items found in Pythia's reading, with the training step that first read them:
+    the questions with the most confirmed copies, and LAMBADA passages read early, midway and late."""
+    exp = REPO_ROOT / "data" / "exposure"
+    out = []
+    pf = exp / "pilot_first_exposure.parquet"
+    if pf.exists():
+        items = {(it["benchmark"], it["item_id"]): it for it in load_items()}
+        f = pd.read_parquet(pf).dropna(subset=["t0"]).sort_values(["copies_verified", "t0"], ascending=[False, True])
+        for r in f.head(n).itertuples():
+            it = items[(r.benchmark, r.item_id)]
+            out.append({"kind": "question", "benchmark": r.benchmark, "text": it["question"], "answer": it["answer_text"],
+                        "t0": int(r.t0), "copies": int(r.copies_verified)})
+    lf, li = exp / "lambada_all_first_exposure.parquet", REPO_ROOT / "data" / "raw" / "items_lambada.jsonl"
+    if lf.exists() and li.exists():
+        lam = {it["item_id"]: it for it in load_items(li)}
+        f = pd.read_parquet(lf)
+        f = f[f["passes_timing"]].sort_values("t0").reset_index(drop=True)
+        for q in (0.15, 0.5, 0.85)[:n]:
+            r = f.iloc[int(q * (len(f) - 1))]
+            it = lam[f"lambada-{r['item_id']}"]
+            words = it["prompt"].split()
+            out.append({"kind": "passage", "benchmark": "lambada", "text": " ".join(words[-28:]), "answer": it["answer_text"],
+                        "t0": int(r["t0"]), "copies": int(r["copies_verified"])})
+    return out
+
+
 def main(argv=None) -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--model", default="pythia-410m")
@@ -113,6 +140,7 @@ def main(argv=None) -> None:
                 "items": int(len(f)), "dated": int(f["t0"].notna().sum()), "pass_timing": int(f["passes_timing"].sum()) if "passes_timing" in f else None,
                 "t0": sorted(int(t) for t in f["t0"].dropna()),
             }
+    out["slips"] = slips()
     cov_path = REPO_ROOT / "data" / "exposure" / "probe_coverage.parquet"
     if cov_path.exists():
         from exposure.probe_coverage import summarise

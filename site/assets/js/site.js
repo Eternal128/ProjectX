@@ -98,7 +98,7 @@ function drawProbe(t0) {
   const { svg, w, h } = frame(box);
   const x = linear(0, DESIGN.total, 6, w - 6);
   const r = timing(t0);
-  svg.append(el('rect', { x: x(DESIGN.filter.lo * DESIGN.total), y: 30, width: x(DESIGN.filter.hi * DESIGN.total) - x(DESIGN.filter.lo * DESIGN.total), height: 66, rx: 6, fill: '#e9f8ef' }));
+  svg.append(el('rect', { x: x(DESIGN.filter.lo * DESIGN.total), y: 30, width: x(DESIGN.filter.hi * DESIGN.total) - x(DESIGN.filter.lo * DESIGN.total), height: 66, rx: 6, fill: 'var(--mark-soft)' }));
   svg.append(el('text', { x: x(0.5 * DESIGN.total), y: 48, 'text-anchor': 'middle' }, 'counted if read in here'));
   svg.append(el('line', { x1: 6, x2: w - 6, y1: 78, y2: 78, stroke: 'var(--grid)', 'stroke-width': 2 }));
   for (const s of DESIGN.checkpoints) {
@@ -106,7 +106,7 @@ function drawProbe(t0) {
     svg.append(el('circle', { cx: x(s), cy: 78, r: 4.5, fill: seen ? 'var(--ink)' : 'var(--bg)', stroke: seen ? 'var(--bg)' : 'var(--axis)', 'stroke-width': seen ? 1.5 : 1.5 }));
   }
   const mx = x(t0);
-  svg.append(el('line', { x1: mx, x2: mx, y1: 18, y2: 104, stroke: r.kept ? '#0ca30c' : '#d03b3b', 'stroke-width': 2 }));
+  svg.append(el('line', { x1: mx, x2: mx, y1: 18, y2: 104, stroke: r.kept ? 'var(--mark)' : 'var(--axis)', 'stroke-width': 3 }));
   svg.append(el('text', { x: 6, y: h - 8 }, '0'));
   svg.append(el('text', { x: x(DESIGN.total / 2), y: h - 8, 'text-anchor': 'middle' }, '71.5k'));
   svg.append(el('text', { x: w - 6, y: h - 8, 'text-anchor': 'end' }, '143k steps'));
@@ -360,14 +360,14 @@ function drawDates(P) {
   const { svg, w } = frame(box, H);
   const m = { l: w < 480 ? 92 : 120, r: 20 };
   const x = linear(0, DESIGN.total, m.l, w - m.r);
-  svg.append(el('rect', { x: x(DESIGN.filter.lo * DESIGN.total), y: 8, width: x(DESIGN.filter.hi * DESIGN.total) - x(DESIGN.filter.lo * DESIGN.total), height: H - 40, rx: 6, fill: '#e9f8ef' }));
-  svg.append(el('text', { x: x(0.5 * DESIGN.total), y: 22, 'text-anchor': 'middle' }, 'usable for the main study if first read in here'));
+  svg.append(el('rect', { x: x(DESIGN.filter.lo * DESIGN.total), y: 8, width: x(DESIGN.filter.hi * DESIGN.total) - x(DESIGN.filter.lo * DESIGN.total), height: H - 40, rx: 6, fill: 'var(--mark-soft)' }));
+  svg.append(el('text', { x: x(0.5 * DESIGN.total), y: 22, 'text-anchor': 'middle' }, w < 480 ? 'usable if first read here' : 'usable for the main study if first read in here'));
   let yAt = 48;
   sets.forEach(([key, d]) => {
     if (d.t0.length > 60) yAt += 24;
     const y = yAt;
     yAt += 46;
-    svg.append(el('text', { x: m.l - 10, y: y + 4, 'text-anchor': 'end', class: 't-ink' }, key === 'pilot' ? 'SciQ, ARC, PIQA' : 'LAMBADA'));
+    svg.append(el('text', { x: m.l - 10, y: y + 4, 'text-anchor': 'end', class: 't-ink' }, key === 'pilot' ? (w < 480 ? 'Questions' : 'SciQ, ARC, PIQA') : 'LAMBADA'));
     svg.append(el('line', { x1: m.l, x2: w - m.r, y1: y, y2: y, stroke: 'var(--grid)' }));
     const color = key === 'pilot' ? 'var(--series-2)' : 'var(--series-1)';
     if (d.t0.length <= 60) {
@@ -386,6 +386,22 @@ function drawDates(P) {
   });
   for (const s of (w < 560 ? [0, 71500, 143000] : [0, 35750, 71500, 107250, 143000])) svg.append(el('text', { x: x(s), y: H - 8, 'text-anchor': s === 0 ? 'start' : s === 143000 ? 'end' : 'middle' }, s === 143000 ? '143k steps' : stepLabel(s)));
   srTable(box, ['Test', 'Items dated', 'First-read steps'], sets.map(([k, d]) => [k === 'pilot' ? 'SciQ, ARC-Easy, PIQA' : 'LAMBADA', fmt(d.dated), d.t0.map(fmt).join(', ')]), 'Training step at which Pythia first read each found item');
+}
+
+// ---------- slips: real items found in the AI's reading ----------
+function renderSlips(P) {
+  const row = document.getElementById('slip-row');
+  if (!row || !P.slips || !P.slips.length) return;
+  const esc = (t) => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+  const name = { arc_easy: 'ARC-Easy, science', sciq: 'SciQ, science', piqa: 'PIQA, common sense', lambada: 'LAMBADA, story ending' };
+  row.innerHTML = P.slips.map((s) => `<article class="slip">
+    <p class="slip__step">First read at step ${fmt(s.t0)}</p>
+    <p class="slip__rule" aria-hidden="true">- - - - - - - - - - - - - - -</p>
+    <p class="slip__test">${name[s.benchmark] || s.benchmark}</p>
+    <p class="slip__text">${s.kind === 'passage' ? '…' : ''}${esc(s.text)}${s.kind === 'passage' ? ' <mark>' + esc(s.answer) + '</mark>' : ''}</p>
+    ${s.kind === 'question' ? `<p class="slip__answer">Answer: <mark>${esc(s.answer)}</mark></p>` : ''}
+    <p class="slip__copies">${s.copies} ${s.copies === 1 ? 'copy' : 'copies'} in its reading</p>
+  </article>`).join('');
 }
 
 // ---------- event study stage (simulated) ----------
@@ -612,6 +628,7 @@ async function getJSON(path) {
   setupProbe();
   setupPaper();
   const [B, M, R, P] = await Promise.all([getJSON('data/benchmarks.json'), getJSON('data/methods.json'), getJSON('data/results.json'), getJSON('data/pilot.json')]);
+  if (P) renderSlips(P);
   if (P && P.groups && Object.keys(P.groups).length) {
     document.getElementById('pilot').hidden = false;
     fillPilot(P);
