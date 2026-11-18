@@ -71,7 +71,7 @@ function gridY(svg, y, ticks, x0, x1, fmtT) {
 function drawLine(svg, pts, color, extra = {}) {
   const p = el('path', { d: pathOf(pts), fill: 'none', stroke: color, 'stroke-width': 2, 'stroke-linejoin': 'round', 'stroke-linecap': 'round', ...extra });
   svg.append(p);
-  if (extra.animate !== false && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+  if (false) { // lines appear at once: no drawing animation
     const len = p.getTotalLength();
     p.style.setProperty('--len', len);
     p.classList.add('line-draw');
@@ -432,20 +432,19 @@ function drawStage(M, state, animate = true) {
 }
 
 function setupStage(M) {
+  // the visitor chooses the step (buttons or the step text); nothing changes on scroll
   const steps = [...document.querySelectorAll('.how__step')];
+  const buttons = [...document.querySelectorAll('.stage-nav button')];
   let current = 0;
-  drawStage(M, 0, false);
-  const io = new IntersectionObserver((entries) => {
-    for (const e of entries) {
-      if (!e.isIntersecting) continue;
-      const s = Number(e.target.dataset.state);
-      if (s === current) continue;
-      current = s;
-      steps.forEach((x) => x.classList.toggle('is-active', x === e.target));
-      drawStage(M, s);
-    }
-  }, { rootMargin: '-45% 0px -45% 0px' });
-  steps.forEach((s) => io.observe(s));
+  const show = (s) => {
+    current = s;
+    steps.forEach((x) => x.classList.toggle('is-active', Number(x.dataset.state) === s));
+    buttons.forEach((b) => b.setAttribute('aria-pressed', String(Number(b.dataset.state) === s)));
+    drawStage(M, s, false);
+  };
+  buttons.forEach((b) => b.addEventListener('click', () => show(Number(b.dataset.state))));
+  steps.forEach((x) => x.addEventListener('click', () => show(Number(x.dataset.state))));
+  show(0);
   new ResizeObserver(() => drawStage(M, current, false)).observe(document.getElementById('stage-chart'));
 }
 

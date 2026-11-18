@@ -190,7 +190,7 @@
 
   <section class="how" id="method" aria-labelledby="how-h">
     <h2 id="how-h" class="section-h" data-reveal>How we will measure memory</h2>
-    <p class="section-p" data-reveal style="--d:1">The real measurement needs months of data work first. So here is our method running on practice data we made up, where we already know the right answer. This is not a result about Pythia yet.</p>
+    <p class="section-p" data-reveal style="--d:1">Here is our method running on practice data we made up, where we already know the right answer. Use the numbered buttons by the chart, or tap a step, to go through it at your own pace.</p>
     <div class="grid how__body">
       <div class="how__steps">
         <div class="how__step is-active" data-state="0">
@@ -211,6 +211,11 @@
           <div class="panel__caption">
             <h3 id="stage-title">Change in the AI’s confidence in the right answer</h3>
             <div class="legend" id="stage-legend"></div>
+          </div>
+          <div class="stage-nav" role="group" aria-label="Choose a step">
+            <button type="button" data-state="0" aria-pressed="true">1. Track both groups</button>
+            <button type="button" data-state="1" aria-pressed="false">2. Subtract</button>
+            <button type="button" data-state="2" aria-pressed="false">3. Look for the jump</button>
           </div>
           <div class="chart" id="stage-chart" role="img" aria-labelledby="stage-title"></div>
           <p class="panel__source">Practice data: 120 made-up questions the AI saw, and 360 it never saw. Across the bottom: snapshots before and after it read the question.</p>
@@ -391,7 +396,7 @@
   </nav>
   <div class="tile tile--place">
     <p>Toronto</p>
-    <p class="soft num" id="toronto-time">Eastern time</p>
+    <p class="soft">University of Toronto</p>
   </div>
   <div class="tile tile--code">
     <p class="soft" style="font-size:14px">Code and data</p>
