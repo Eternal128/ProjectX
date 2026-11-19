@@ -52,19 +52,40 @@ def slips(n: int = 3) -> list[dict]:
         for r in f.head(n).itertuples():
             it = items[(r.benchmark, r.item_id)]
             out.append({"kind": "question", "benchmark": r.benchmark, "text": it["question"], "answer": it["answer_text"],
-                        "t0": int(r.t0), "copies": int(r.copies_verified)})
+                        "t0": int(r.t0), "copies": int(r.copies_verified), "usable": bool(r.passes_timing)})
     lf, li = exp / "lambada_all_first_exposure.parquet", REPO_ROOT / "data" / "raw" / "items_lambada.jsonl"
     if lf.exists() and li.exists():
         lam = {it["item_id"]: it for it in load_items(li)}
         f = pd.read_parquet(lf)
         f = f[f["passes_timing"]].sort_values("t0").reset_index(drop=True)
-        for q in (0.15, 0.5, 0.85)[:n]:
+        for q in np.linspace(0.08, 0.92, n):
             r = f.iloc[int(q * (len(f) - 1))]
             it = lam[f"lambada-{r['item_id']}"]
             words = it["prompt"].split()
             out.append({"kind": "passage", "benchmark": "lambada", "text": " ".join(words[-28:]), "answer": it["answer_text"],
-                        "t0": int(r["t0"]), "copies": int(r["copies_verified"])})
+                        "t0": int(r["t0"]), "copies": int(r["copies_verified"]), "usable": True})
     return out
+
+
+def seeds(n: int = 8) -> dict | None:
+    """The same items in all 10 training runs (seed 0 plus PolyPythias seeds 1 to 9): the first-read
+    step of each item in each run, for n items dated in every run, spread over seed 0's first-read step;
+    and the median spread (latest minus earliest first read) over every item, as seed_dates prints it."""
+    fp = REPO_ROOT / "data" / "exposure" / "seed_first_exposure.parquet"
+    if not fp.exists():
+        return None
+    f = pd.read_parquet(fp)
+    spread = f.groupby(["benchmark", "item_id"])["t0"].agg(["min", "max", "count"])
+    runs = int(f["seed"].nunique())
+    full = f.dropna(subset=["t0"]).groupby(["benchmark", "item_id"]).filter(lambda g: len(g) == runs)
+    s0 = full[full["seed"] == 0].sort_values("t0").reset_index(drop=True)
+    picks = [s0.iloc[int(q * (len(s0) - 1))] for q in np.linspace(0.05, 0.95, n)] if len(s0) else []
+    items = []
+    for r in picks:
+        g = full[(full["benchmark"] == r["benchmark"]) & (full["item_id"] == r["item_id"])].sort_values("seed")
+        items.append({"benchmark": r["benchmark"], "item_id": str(r["item_id"]), "t0": [int(t) for t in g["t0"]]})
+    return {"runs": runs, "items_dated": int(len(spread)), "median_spread": int((spread["max"] - spread["min"]).median()),
+            "examples": items}
 
 
 def main(argv=None) -> None:
@@ -140,7 +161,10 @@ def main(argv=None) -> None:
                 "items": int(len(f)), "dated": int(f["t0"].notna().sum()), "pass_timing": int(f["passes_timing"].sum()) if "passes_timing" in f else None,
                 "t0": sorted(int(t) for t in f["t0"].dropna()),
             }
-    out["slips"] = slips()
+    out["slips"] = slips(6)
+    sd = seeds()
+    if sd:
+        out["seeds"] = sd
     cov_path = REPO_ROOT / "data" / "exposure" / "probe_coverage.parquet"
     if cov_path.exists():
         from exposure.probe_coverage import summarise
