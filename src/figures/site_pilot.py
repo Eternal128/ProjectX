@@ -9,7 +9,9 @@ data/exposure/pilot_tiers.parquet (Pile search). Writes:
   - per exposure group (confirmed / question_only / clean): accuracy and mean
     log-probability of the right answer at each checkpoint, with 95% bootstrap
     intervals over items;
-  - how many items fall in each group, and a few confirmed examples.
+  - how many items fall in each group, and a few confirmed examples;
+  - when data/exposure/probe_coverage.parquet exists, the share of items found by the
+    wider coverage probe (13-word windows, LAMBADA and TriviaQA samples), with 95% intervals.
 
 This is descriptive: it compares seen and unseen items over training. It does not
 estimate the step each item was first read (that needs the preshuffled training data),
@@ -38,6 +40,54 @@ def boot_ci(x: np.ndarray, reps: int = 1000, seed: int = 0) -> tuple[float, floa
     return float(lo), float(hi)
 
 
+def slips(n: int = 3) -> list[dict]:
+    """Real items found in Pythia's reading, with the training step that first read them:
+    the questions with the most confirmed copies, and LAMBADA passages read early, midway and late."""
+    exp = REPO_ROOT / "data" / "exposure"
+    out = []
+    pf = exp / "pilot_first_exposure.parquet"
+    if pf.exists():
+        items = {(it["benchmark"], it["item_id"]): it for it in load_items()}
+        f = pd.read_parquet(pf).dropna(subset=["t0"]).sort_values(["copies_verified", "t0"], ascending=[False, True])
+        for r in f.head(n).itertuples():
+            it = items[(r.benchmark, r.item_id)]
+            out.append({"kind": "question", "benchmark": r.benchmark, "text": it["question"], "answer": it["answer_text"],
+                        "t0": int(r.t0), "copies": int(r.copies_verified), "usable": bool(r.passes_timing)})
+    lf, li = exp / "lambada_all_first_exposure.parquet", REPO_ROOT / "data" / "raw" / "items_lambada.jsonl"
+    if lf.exists() and li.exists():
+        lam = {it["item_id"]: it for it in load_items(li)}
+        f = pd.read_parquet(lf)
+        f = f[f["passes_timing"]].sort_values("t0").reset_index(drop=True)
+        for q in np.linspace(0.08, 0.92, n):
+            r = f.iloc[int(q * (len(f) - 1))]
+            it = lam[f"lambada-{r['item_id']}"]
+            words = it["prompt"].split()
+            out.append({"kind": "passage", "benchmark": "lambada", "text": " ".join(words[-28:]), "answer": it["answer_text"],
+                        "t0": int(r["t0"]), "copies": int(r["copies_verified"]), "usable": True})
+    return out
+
+
+def seeds(n: int = 8) -> dict | None:
+    """The same items in all 10 training runs (seed 0 plus PolyPythias seeds 1 to 9): the first-read
+    step of each item in each run, for n items dated in every run, spread over seed 0's first-read step;
+    and the median spread (latest minus earliest first read) over every item, as seed_dates prints it."""
+    fp = REPO_ROOT / "data" / "exposure" / "seed_first_exposure.parquet"
+    if not fp.exists():
+        return None
+    f = pd.read_parquet(fp)
+    spread = f.groupby(["benchmark", "item_id"])["t0"].agg(["min", "max", "count"])
+    runs = int(f["seed"].nunique())
+    full = f.dropna(subset=["t0"]).groupby(["benchmark", "item_id"]).filter(lambda g: len(g) == runs)
+    s0 = full[full["seed"] == 0].sort_values("t0").reset_index(drop=True)
+    picks = [s0.iloc[int(q * (len(s0) - 1))] for q in np.linspace(0.05, 0.95, n)] if len(s0) else []
+    items = []
+    for r in picks:
+        g = full[(full["benchmark"] == r["benchmark"]) & (full["item_id"] == r["item_id"])].sort_values("seed")
+        items.append({"benchmark": r["benchmark"], "item_id": str(r["item_id"]), "t0": [int(t) for t in g["t0"]]})
+    return {"runs": runs, "items_dated": int(len(spread)), "median_spread": int((spread["max"] - spread["min"]).median()),
+            "examples": items}
+
+
 def main(argv=None) -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--model", default="pythia-410m")
@@ -46,7 +96,10 @@ def main(argv=None) -> None:
     files = sorted((REPO_ROOT / "data" / "evals" / "pilot" / args.model).glob("step*.parquet"))
     if not files:
         raise SystemExit("no pilot scores yet: run python -m evals.score_cpu first")
-    df = pd.concat([pd.read_parquet(f) for f in files])
+    lam_files = sorted((REPO_ROOT / "data" / "evals" / "pilot" / args.model / "lambada").glob("step*.parquet"))
+    df = pd.concat([pd.read_parquet(f) for f in files + lam_files])
+    # each benchmark keeps the checkpoints it has been scored at (runs can be partway through);
+    # `steps` is their union, and every series row carries its own step
     steps = sorted(df["step"].unique().tolist())
 
     published = json.loads((REPO_ROOT / "site" / "data" / "benchmarks.json").read_text())
@@ -57,32 +110,66 @@ def main(argv=None) -> None:
            "accuracy": {}, "groups": {}, "tier_counts": {}, "examples": []}
     for b, g in df.groupby("benchmark"):
         acc = g.groupby("step")["y"].mean()
-        out["accuracy"][b] = [[int(s), round(float(acc[s]), 4), pub.get(b, {}).get(int(s))] for s in steps]
+        out["accuracy"][b] = [[int(s), round(float(acc[s]), 4), pub.get(b, {}).get(int(s))] for s in sorted(acc.index)]
 
     tiers_path = REPO_ROOT / "data" / "exposure" / "pilot_tiers.parquet"
     if tiers_path.exists():
         tiers = pd.read_parquet(tiers_path)[["benchmark", "item_id", "tier", "q_count", "qa_count"]]
+        cov_path = REPO_ROOT / "data" / "exposure" / "probe_coverage.parquet"
+        if lam_files and cov_path.exists():
+            # LAMBADA: the probe's 13-word window ends in the answer word, so a hit means the
+            # passage and its answer were in the Pile ("confirmed"); no hit means "clean"
+            cov = pd.read_parquet(cov_path)
+            lam = cov[cov["benchmark"] == "lambada"].groupby("item_id")["count"].max().reset_index()
+            tiers = pd.concat([tiers, pd.DataFrame({
+                "benchmark": "lambada", "item_id": "lambada-" + lam["item_id"].astype(str),
+                "tier": ["confirmed" if c > 0 else "clean" for c in lam["count"]],
+                "q_count": lam["count"].astype(int), "qa_count": lam["count"].astype(int)})], ignore_index=True)
         out["tier_counts"] = {b: {k: int(v) for k, v in g["tier"].value_counts().items()} for b, g in tiers.groupby("benchmark")}
-        m = df.merge(tiers, on=["benchmark", "item_id"], how="inner")
-        for b, gb in list(m.groupby("benchmark")) + [("all", m)]:
+        m = df.drop(columns=["tier", "t0", "n"], errors="ignore").merge(tiers, on=["benchmark", "item_id"], how="inner")
+        pilot_three = m[m["benchmark"] != "lambada"]
+        common = set.intersection(*(set(g["step"]) for _, g in pilot_three.groupby("benchmark"))) if len(pilot_three) else set()
+        for b, gb in list(m.groupby("benchmark")) + [("all", pilot_three[pilot_three["step"].isin(common)])]:
             out["groups"][b] = {}
             for t in GROUPS:
                 gt = gb[gb["tier"] == t]
                 if gt.empty:
                     continue
                 series = []
-                for s in steps:
+                for s in sorted(gt["step"].unique()):
                     gs = gt[gt["step"] == s]
                     y, lp = gs["y"].to_numpy(float), gs["logp"].to_numpy(float)
                     series.append([int(s), round(float(y.mean()), 4), *[round(v, 4) for v in boot_ci(y)],
                                    round(float(lp.mean()), 4), *[round(v, 4) for v in boot_ci(lp)]])
                 out["groups"][b][t] = {"n": int(gt["item_id"].nunique()), "series": series}
-        items = {(it["benchmark"], it["item_id"]): it for it in load_items()}
-        conf = tiers[tiers["tier"] == "confirmed"].sort_values("qa_count", ascending=False)
+        all_items = load_items()
+        lam_items = REPO_ROOT / "data" / "raw" / "items_lambada.jsonl"
+        if lam_items.exists():
+            all_items += load_items(lam_items)
+        items = {(it["benchmark"], it["item_id"]): it for it in all_items}
+        conf = tiers[(tiers["tier"] == "confirmed") & (tiers["benchmark"] != "lambada")].sort_values("qa_count", ascending=False)
         for r in conf.head(6).itertuples():
             it = items[(r.benchmark, r.item_id)]
             out["examples"].append({"benchmark": r.benchmark, "question": it["question"], "answer": it["answer_text"],
                                     "copies": int(r.qa_count)})
+    lam_src = "lambada_all" if (REPO_ROOT / "data" / "exposure" / "lambada_all_first_exposure.parquet").exists() else "lambada"
+    for source in ("pilot", lam_src):
+        fe = REPO_ROOT / "data" / "exposure" / f"{source}_first_exposure.parquet"
+        if fe.exists():
+            f = pd.read_parquet(fe)
+            out.setdefault("dates", {})["lambada" if source == "lambada_all" else source] = {
+                "items": int(len(f)), "dated": int(f["t0"].notna().sum()), "pass_timing": int(f["passes_timing"].sum()) if "passes_timing" in f else None,
+                "t0": sorted(int(t) for t in f["t0"].dropna()),
+            }
+    out["slips"] = slips(6)
+    sd = seeds()
+    if sd:
+        out["seeds"] = sd
+    cov_path = REPO_ROOT / "data" / "exposure" / "probe_coverage.parquet"
+    if cov_path.exists():
+        from exposure.probe_coverage import summarise
+
+        out["coverage"] = summarise(pd.read_parquet(cov_path)).to_dict(orient="records")
     out["provenance"] = provenance({"model": args.model, "steps": steps})
     path = REPO_ROOT / args.out
     path.write_text(json.dumps(out, separators=(",", ":")) + "\n")

@@ -33,3 +33,45 @@ def test_tiers():
 
 def test_clean_text_keeps_query_operators_out_of_items():
     assert clean_text("salt AND  pepper OR sugar") == "salt and pepper or sugar"
+
+
+def test_coverage_windows_take_first_and_last_13_words():
+    from exposure.probe_coverage import windows
+
+    words = [f"w{i}" for i in range(20)]
+    w = windows(" ".join(words))
+    assert w["first"].split() == words[:13] and w["last"].split() == words[-13:]
+    assert windows("too short to have a window") == {}
+
+
+def test_coverage_wilson_interval_brackets_the_share():
+    from exposure.probe_coverage import wilson
+
+    lo, hi = wilson(2, 100)
+    assert 0 < lo < 0.02 < hi < 0.08
+    assert wilson(0, 50)[0] == 0.0
+
+
+def test_coverage_summary_counts_an_item_once_across_windows():
+    import pandas as pd
+    from exposure.probe_coverage import summarise
+
+    df = pd.DataFrame([
+        {"benchmark": "sciq", "item_id": "a", "check": "window_first", "count": 2},
+        {"benchmark": "sciq", "item_id": "a", "check": "window_last", "count": 5},
+        {"benchmark": "sciq", "item_id": "b", "check": "window_first", "count": 0},
+        {"benchmark": "triviaqa", "item_id": "q1", "check": "question", "count": 3},
+        {"benchmark": "triviaqa", "item_id": "q1", "check": "question_and_answer", "count": 1},
+        {"benchmark": "triviaqa", "item_id": "q2", "check": "question", "count": 0},
+    ])
+    s = summarise(df).set_index(["benchmark", "check"])
+    assert s.loc[("sciq", "13-word window found"), "found"] == 1 and s.loc[("sciq", "13-word window found"), "items"] == 2
+    assert s.loc[("triviaqa", "question and answer found"), "share"] == 0.5
+
+
+def test_lambada_item_predicts_the_last_word_greedily():
+    from evals.benchmarks import items_lambada
+
+    it = items_lambada([{"text": "She opened the door and saw her brother"}])[0]
+    assert it["prompt"] == "She opened the door and saw her" and it["choices"] == [" brother"]
+    assert it["greedy"] is True and it["answer"] == 0 and it["item_id"] == "lambada-0"

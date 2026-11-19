@@ -40,7 +40,9 @@ def score_items(model, tok, items, batch_tokens: int = 6000) -> list[dict]:
             ids = (ctx + cont)[-2048:]
             seqs.append((i, j, ids, len(cont)))
     order = sorted(range(len(seqs)), key=lambda k: len(seqs[k][2]))
+    body, head = model.base_model, model.get_output_embeddings()
     ll = np.zeros(len(seqs))
+    greedy = np.zeros(len(seqs), dtype=bool)
     k = 0
     with torch.inference_mode():
         while k < len(order):
@@ -54,23 +56,30 @@ def score_items(model, tok, items, batch_tokens: int = 6000) -> list[dict]:
             for r, t in enumerate(idx):
                 ids = seqs[t][2]
                 batch[r, :len(ids)] = torch.tensor(ids)
-            logits = model(batch).logits.float()
-            logprobs = torch.log_softmax(logits, dim=-1)
+            # run the transformer, then the output layer only at the answer positions: the same
+            # numbers as model(batch).logits there, without a (batch x length x 50k) tensor
+            hidden = body(input_ids=batch).last_hidden_state
             for r, t in enumerate(idx):
                 ids, ncont = seqs[t][2], seqs[t][3]
                 n = len(ids)
                 pos = torch.arange(n - ncont - 1, n - 1)
                 tgt = torch.tensor(ids[n - ncont:])
-                ll[t] = logprobs[r, pos, tgt].sum().item()
+                logits = head(hidden[r, pos]).float()
+                ll[t] = torch.log_softmax(logits, dim=-1)[torch.arange(ncont), tgt].sum().item()
+                greedy[t] = bool((logits.argmax(-1) == tgt).all())
             k += bs
     by_item: dict[int, list[float]] = {}
+    greedy_of: dict[tuple[int, int], bool] = {}
     for t, (i, j, _, _) in enumerate(seqs):
         by_item.setdefault(i, []).append(ll[t])
+        greedy_of[(i, j)] = bool(greedy[t])
     rows = []
     for i, it in enumerate(items):
         scores = by_item[i]
-        rows.append({"benchmark": it["benchmark"], "item_id": it["item_id"],
-                     "y": int(int(np.argmax(scores)) == it["answer"]), "logp": float(scores[it["answer"]])})
+        # multiple choice: right if the correct choice scores highest; greedy tasks (LAMBADA):
+        # right if every token of the answer is the model's top prediction
+        y = greedy_of[(i, it["answer"])] if it.get("greedy") else int(np.argmax(scores)) == it["answer"]
+        rows.append({"benchmark": it["benchmark"], "item_id": it["item_id"], "y": int(y), "logp": float(scores[it["answer"]])})
     return rows
 
 
@@ -81,6 +90,8 @@ def main(argv=None) -> None:
     ap.add_argument("--limit", type=int, default=None, help="first N items per benchmark (smoke test)")
     ap.add_argument("--threads", type=int, default=None)
     ap.add_argument("--keep-cache", action="store_true")
+    ap.add_argument("--items", default=None, help="item file (default data/raw/items.jsonl)")
+    ap.add_argument("--tag", default=None, help="write to data/evals/pilot/<model>/<tag>/ (e.g. lambada)")
     args = ap.parse_args(argv)
 
     import torch
@@ -89,7 +100,7 @@ def main(argv=None) -> None:
     if args.threads:
         torch.set_num_threads(args.threads)
     torch.manual_seed(1234)
-    items = load_items()
+    items = load_items(args.items) if args.items else load_items()
     if args.limit:
         counts: dict[str, int] = {}
         kept = []
@@ -100,12 +111,17 @@ def main(argv=None) -> None:
         items = kept
     name = args.model.split("/")[-1]
     out_dir = REPO_ROOT / "data" / "evals" / "pilot" / name
-    cache = REPO_ROOT / "data" / "hf_cache"
+    if args.tag:
+        out_dir = out_dir / args.tag
+    if args.limit:  # smoke tests go aside so they never block or mix with the full run
+        out_dir = out_dir / "smoke"
+    # a tagged run gets its own cache, so its cleanup never touches another run's download
+    cache = REPO_ROOT / "data" / ("hf_cache" if not args.tag else f"hf_cache_{args.tag}")
     tok = AutoTokenizer.from_pretrained(args.model, revision=f"step{args.steps[-1]}", cache_dir=cache)
     prov = provenance({"model": args.model, "steps": args.steps, "limit": args.limit, "n_items": len(items)})
     for step in args.steps:
         out = out_dir / f"step{step}.parquet"
-        if out.exists() and not args.limit:
+        if out.exists():
             print(f"step{step}: already scored")
             continue
         t0 = time.time()
@@ -120,7 +136,8 @@ def main(argv=None) -> None:
         print(f"step{step}: {len(df)} items in {time.time() - t0:.0f}s, accuracy {acc}", flush=True)
         del model
         if not args.keep_cache:
-            for d in cache.glob(f"models--{args.model.replace('/', '--')}/blobs"):
+            # newer huggingface_hub versions keep files in a shared cache/blobs folder, older ones per model
+            for d in [cache / "blobs", *cache.glob(f"models--{args.model.replace('/', '--')}/blobs")]:
                 shutil.rmtree(d, ignore_errors=True)
 
 

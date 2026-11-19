@@ -41,3 +41,7 @@ lm_eval_cache/
 
 # Vercel
 .vercel/
+
+# Agent skills installed with `npx skills add` (restore from skills-lock.json; too large for git)
+.agents/
+.claude/skills/
